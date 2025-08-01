@@ -1271,3 +1271,4 @@ def run_evaluation_suite() -> dict:
     report["reportPaths"]["latestJsonPath"] = LATEST_EVALUATION_PATH
     report["reportPaths"]["latestHtmlPath"] = LATEST_EVALUATION_HTML_PATH
     return report
+
