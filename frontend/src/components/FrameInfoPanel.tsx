@@ -42,10 +42,10 @@ const FrameInfoPanel = ({
   isDemoMode,
 }: FrameInfoPanelProps) => {
   return (
-    <div className="w-72 bg-card border-l flex flex-col h-full">
-      <div className="px-4 py-3 border-b">
-        <h2 className="text-xs font-semibold font-mono text-foreground tracking-wide">
-          Frame Information
+    <div className="w-80 bg-panel/95 backdrop-blur border-l border-border/50 flex flex-col h-full shadow-2xl z-20">
+      <div className="px-5 py-4 border-b border-border/50 bg-white/5">
+        <h2 className="text-[11px] font-semibold font-mono text-muted-foreground tracking-widest uppercase">
+          Frame Analytics
         </h2>
       </div>
 
@@ -58,23 +58,23 @@ const FrameInfoPanel = ({
           onToggleViewChange={onToggleViewChange}
         />
 
-        <div className="px-4 py-4 space-y-5">
+        <div className="px-5 py-5 space-y-6">
           {/* Timestamp */}
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-sans">
+          <div className="flex justify-between items-baseline border-b border-border/30 pb-2">
+            <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
               Timestamp
             </label>
-            <p className="text-sm font-mono text-foreground mt-1">{frame.timestamp}</p>
+            <p className="text-sm font-mono text-foreground">{frame.timestamp}</p>
           </div>
 
           {/* Frame Type */}
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-sans">
+          <div className="flex justify-between items-baseline border-b border-border/30 pb-2">
+            <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
               Frame Type
             </label>
             <p
-              className={`text-sm font-mono mt-1 ${
-                frame.isOriginal ? "text-foreground font-semibold" : "text-primary"
+              className={`text-sm font-mono ${
+                frame.isOriginal ? "text-foreground" : "text-primary"
               }`}
             >
               {frame.isOriginal ? "Original" : "Generated"}
@@ -83,76 +83,80 @@ const FrameInfoPanel = ({
 
           {/* Confidence */}
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-sans">
-              Confidence Score
-            </label>
-            <div className="flex items-center gap-3 mt-1">
-              <span className="text-sm font-mono text-foreground">
-                {frame.confidence.toFixed(2)}
-              </span>
-              <ConfidenceIndicator confidence={frame.confidence} />
+            <div className="flex justify-between items-baseline mb-2">
+              <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
+                Confidence Score
+              </label>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-mono text-foreground">
+                  {frame.confidence.toFixed(2)}
+                </span>
+                <ConfidenceIndicator confidence={frame.confidence} />
+              </div>
             </div>
-            <div className="mt-2 h-1 w-full bg-border rounded overflow-hidden">
+            <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden border border-white/5">
               <div
-                className="h-full bg-primary rounded transition-all duration-300"
+                className="h-full bg-primary rounded-full transition-all duration-500 ease-out relative"
                 style={{ width: `${frame.confidence * 100}%` }}
-              />
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/30" />
+              </div>
             </div>
           </div>
 
           {/* Source Frames */}
           {frame.sourceFrames && (
-            <div>
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-sans">
+            <div className="flex justify-between items-baseline border-b border-border/30 pb-2">
+              <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
                 Source Frames
               </label>
-              <p className="text-sm font-mono text-foreground mt-1">
+              <p className="text-sm font-mono text-foreground">
                 {frame.sourceFrames[0]} → {frame.sourceFrames[1]}
               </p>
             </div>
           )}
 
           {/* Frame Index */}
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-sans">
-              Frame Index
+          <div className="flex justify-between items-baseline border-b border-border/30 pb-2">
+            <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
+              Sequence Position
             </label>
-            <p className="text-sm font-mono text-foreground mt-1">
+            <p className="text-sm font-mono text-foreground">
               {frameIndex + 1} / {totalFrames}
             </p>
           </div>
 
-          <div className="border-t pt-4">
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-sans">
-              Interpolation Method
+          <div className="flex justify-between items-baseline border-b border-border/30 pb-2 pt-2">
+            <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
+              Model
             </label>
-            <p className="text-sm font-mono text-foreground mt-1">
-              {frame.isOriginal ? "N/A" : "WMS-Based AI"}
+            <p className="text-[11px] font-mono text-foreground">
+              {frame.isOriginal ? "N/A" : "WMS-AI Interpolator"}
             </p>
           </div>
 
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-sans">
+          <div className="flex justify-between items-baseline border-b border-border/30 pb-2">
+            <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
               Resolution
             </label>
-            <p className="text-sm font-mono text-foreground mt-1">256 × 256 px</p>
+            <p className="text-[11px] font-mono text-foreground">256 × 256 px</p>
           </div>
 
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-sans">
-              Coordinate System
+          <div className="flex justify-between items-baseline border-b border-border/30 pb-2">
+            <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
+              Projection Coordinates
             </label>
-            <p className="text-sm font-mono text-foreground mt-1">EPSG:3857</p>
+            <p className="text-[11px] font-mono text-foreground">EPSG:3857</p>
           </div>
 
           {/* Data source indicator */}
-          <div className="border-t pt-4">
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-sans">
-              Data Source
+          <div className="pt-4 flex items-center justify-between">
+            <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
+              Data Pipeline
             </label>
-            <div className="flex items-center gap-2 mt-1">
-              <div className={`w-2 h-2 rounded-full ${isDemoMode ? "bg-confidence-medium" : "bg-confidence-high"}`} />
-              <span className="text-sm font-mono text-foreground">
+            <div className="flex items-center gap-2">
+              <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isDemoMode ? "bg-confidence-medium" : "bg-confidence-high"}`} />
+              <span className="text-[11px] font-mono text-foreground">
                 {isDemoMode ? "Demo Dataset" : "Live API"}
               </span>
             </div>

@@ -7,15 +7,15 @@ const LegendPanel = () => {
   ];
 
   return (
-    <div className="absolute bottom-3 left-3 z-10 bg-card/90 border rounded p-3 min-w-[150px]">
-      <h3 className="text-[10px] uppercase tracking-wider text-muted-foreground font-sans mb-2">
-        Legend
+    <div className="absolute bottom-4 left-4 z-10 bg-panel/80 backdrop-blur-md border border-border/50 rounded-sm p-3 min-w-[160px] shadow-2xl">
+      <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono mb-2 border-b border-border/50 pb-1.5">
+        Map Legend
       </h3>
-      <div className="space-y-1.5">
+      <div className="space-y-2 mt-2">
         {items.map((item) => (
           <div key={item.label} className="flex items-center gap-2">
-            <div className={`w-3 h-2 rounded-sm ${item.color}`} />
-            <span className="text-[11px] text-foreground">{item.label}</span>
+            <div className={`w-3 h-1.5 rounded-sm ${item.color} shadow-sm`} />
+            <span className="text-[10px] font-mono text-foreground tracking-wide">{item.label}</span>
           </div>
         ))}
       </div>

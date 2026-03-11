@@ -4,7 +4,6 @@ import MapViewer from "@/components/MapViewer";
 import TimelineSlider from "@/components/TimelineSlider";
 import AnimationControls from "@/components/AnimationControls";
 import FrameInfoPanel from "@/components/FrameInfoPanel";
-import CurrentTimeDisplay from "@/components/CurrentTimeDisplay";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import ErrorPanel from "@/components/ErrorPanel";
 import { MOCK_FRAMES } from "@/lib/mock-data";
@@ -124,21 +123,21 @@ const Index = () => {
   }, [fetchFromApi]);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground selection:bg-primary/30">
       <DashboardHeader dataSource={dataSource} onToggleDataSource={handleToggleDataSource} />
 
-      <div className="flex flex-1 min-h-0">
-        {/* Map area */}
-        <div className="flex-1 p-3 relative">
+      <div className="flex flex-1 min-h-0 relative">
+        {/* Main Map Area - Full Screen */}
+        <div className="flex-1 relative bg-map-bg">
           {isLoading && (
             <LoadingOverlay
-              message={loadProgress < 100 ? "Loading frames…" : "Generating animation…"}
+              message={loadProgress < 100 ? "INITIALIZING DATA STREAM…" : "SYNCHRONIZING SENSORS…"}
               progress={loadProgress}
             />
           )}
           {error && <ErrorPanel message={error} onRetry={handleRetry} />}
 
-          {/* Split view */}
+          {/* Map Viewer Rendering */}
           {comparisonMode === "split" && !error && !isLoading ? (
             <div className="flex w-full h-full gap-1">
               <div className="flex-1 relative">
@@ -203,13 +202,16 @@ const Index = () => {
 
           {/* No frame fallback */}
           {!isLoading && !error && !currentFrame && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-20">
-              <p className="text-xs font-mono text-muted-foreground">No frame available</p>
+            <div className="absolute inset-0 flex items-center justify-center bg-background/90 backdrop-blur-sm z-50">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                <p className="text-[10px] tracking-widest uppercase font-mono text-primary animate-pulse">Waiting for telemetry</p>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Frame info panel */}
+        {/* Right-Side Dashboard Frame Info */}
         <FrameInfoPanel
           frame={currentFrame}
           frameIndex={currentIndex}
@@ -222,14 +224,14 @@ const Index = () => {
         />
       </div>
 
-      {/* Bottom controls */}
-      <div className="border-t bg-secondary px-6 py-3 space-y-3">
+      {/* Bottom Timeline & Playback Control Bar */}
+      <div className="border-t border-border/50 bg-panel/95 backdrop-blur px-8 py-4 z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col gap-4">
         <TimelineSlider
           frames={frames}
           currentIndex={currentIndex}
           onIndexChange={setCurrentIndex}
         />
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between border-t border-border/30 pt-3">
           <AnimationControls
             isPlaying={isPlaying}
             onPlayPause={() => setIsPlaying(!isPlaying)}
@@ -240,7 +242,6 @@ const Index = () => {
             opacity={opacity}
             onOpacityChange={setOpacity}
           />
-          <CurrentTimeDisplay frame={currentFrame} />
         </div>
       </div>
     </div>
