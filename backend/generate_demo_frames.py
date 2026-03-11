@@ -24,7 +24,7 @@ FRAMES = [
 ]
 
 
-def create_png(width, height, top_color, bottom_color):
+def create_png(width: int, height: int, top_color: tuple, bottom_color: tuple) -> bytes:
     """Create a simple gradient PNG using pure Python (no PIL needed)."""
     def make_chunk(chunk_type, data):
         chunk = chunk_type + data
@@ -33,12 +33,12 @@ def create_png(width, height, top_color, bottom_color):
     raw_data = b''
     for y in range(height):
         raw_data += b'\x00'  # filter byte
-        t = float(y) / max(height - 1, 1)
+        t = float(y) / float(max(height - 1, 1))
         for x in range(width):
-            tx = x / max(width - 1, 1)
-            r = int(top_color[0] * (1 - t) + bottom_color[0] * t + 30 * tx)
-            g = int(top_color[1] * (1 - t) + bottom_color[1] * t + 20 * (1 - tx))
-            b = int(top_color[2] * (1 - t) + bottom_color[2] * t)
+            tx = float(x) / float(max(width - 1, 1))
+            r = int(float(top_color[0]) * (1.0 - t) + float(bottom_color[0]) * t + 30.0 * tx)
+            g = int(float(top_color[1]) * (1.0 - t) + float(bottom_color[1]) * t + 20.0 * (1.0 - tx))
+            b = int(float(top_color[2]) * (1.0 - t) + float(bottom_color[2]) * t)
             r, g, b = min(r, 255), min(g, 255), min(b, 255)
             raw_data += struct.pack('BBB', r, g, b)
 
