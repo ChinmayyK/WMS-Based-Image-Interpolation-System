@@ -1,68 +1,89 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
+@layer base {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    --background: 216 14% 12%;
+    --foreground: 216 14% 80%;
+
+    --card: 213 10% 20%;
+    --card-foreground: 216 14% 80%;
+
+    --popover: 213 10% 20%;
+    --popover-foreground: 216 14% 80%;
+
+    --primary: 216 40% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 213 8% 16%;
+    --secondary-foreground: 216 14% 80%;
+
+    --muted: 213 8% 16%;
+    --muted-foreground: 216 10% 55%;
+
+    --accent: 216 40% 58%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 8% 24%;
+    --input: 210 8% 24%;
+    --ring: 216 40% 58%;
+
+    --radius: 0.375rem;
+
+    --map-bg: 213 10% 16%;
+    --panel: 213 10% 20%;
+    --confidence-high: 142 50% 45%;
+    --confidence-medium: 45 80% 55%;
+    --confidence-low: 0 62% 50%;
+
+    --sidebar-background: 213 10% 14%;
+    --sidebar-foreground: 216 14% 80%;
+    --sidebar-primary: 216 40% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 213 8% 18%;
+    --sidebar-accent-foreground: 216 14% 80%;
+    --sidebar-border: 210 8% 24%;
+    --sidebar-ring: 216 40% 58%;
   }
-  a:hover {
-    color: #747bff;
+}
+
+@layer base {
+  * {
+    @apply border-border;
   }
-  button {
-    background-color: #f9f9f9;
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
   }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Source Code Pro', monospace;
+  }
+}
+
+/* OpenLayers overrides */
+.ol-control {
+  background: hsl(213 10% 20% / 0.85) !important;
+  border-radius: 4px !important;
+}
+
+.ol-control button {
+  color: hsl(216 14% 80%) !important;
+  background: transparent !important;
+  font-size: 1rem !important;
+}
+
+.ol-control button:hover {
+  background: hsl(216 40% 58% / 0.3) !important;
+}
+
+.ol-attribution {
+  font-size: 10px !important;
 }
