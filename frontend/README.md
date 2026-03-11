@@ -1,73 +1,35 @@
-# Welcome to your Lovable project
+# WMS-Based Image Interpolation System - Frontend
 
-## Project info
+This is the frontend client for the **WMS-Based Image Interpolation System**. It provides a WebGIS dashboard built with **React**, **Vite**, and **OpenLayers** to visualize satellite imagery and AI-interpolated sequences.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- **Map Viewer:** Renders an OpenStreetMap base layer with dynamically generated satellite image overlays (`OpenLayers`).
+- **Interactive Timeline:** A specialized timeline slider to scrub through real and AI-generated frames.
+- **Animation Controls:** Play, pause, and speed adjustments for observing image interpolation over time.
+- **Comparison View:** Toggle or split views to compare original satellite imagery with AI-interpolated output.
+- **Metadata Panel:** Real-time information, confidence scores, and origin details for the currently active frame.
 
-There are several ways of editing your application.
+## Technologies Used
 
-**Use Lovable**
+- **React 18** (Vite + TypeScript)
+- **OpenLayers** (`ol`) for mapping
+- **Tailwind CSS** + **Shadcn UI** for styling and components
+- **TanStack Query** for API state management
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+1. Ensure the Python FastAPI backend is running on port 8000.
+2. Install dependencies:
+   ```sh
+   npm install
+   ```
+3. Start the development server:
+   ```sh
+   npm run dev
+   ```
+   The site will open at `http://localhost:8080`.
 
-**Use your preferred IDE**
+## Architecture Note
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+The frontend uses Vite's proxy feature to automatically route requests falling under `/api` and `/data` to the FastAPI backend running on `localhost:8000`. This circumvents CORS issues during local development.
