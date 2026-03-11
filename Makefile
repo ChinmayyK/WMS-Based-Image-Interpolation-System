@@ -16,3 +16,6 @@ run-backend:
 
 run-frontend:
 	cd frontend && npm run dev
+
+test-backend:
+	cd backend && pytest tests/
