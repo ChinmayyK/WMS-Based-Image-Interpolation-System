@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+owslib
+rasterio
+numpy
+gdal
+opencv-python
+torch
+torchvision
