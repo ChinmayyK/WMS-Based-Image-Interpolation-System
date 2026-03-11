@@ -1,10 +1,15 @@
+# === Core (Chinmay - Backend API) ===
 fastapi
-uvicorn
+uvicorn[standard]
 pydantic
-owslib
-rasterio
-numpy
-gdal
-opencv-python
-torch
-torchvision
+
+# === Hrishikesh - WMS & Preprocessing (install when needed) ===
+# owslib
+# rasterio
+# gdal
+# opencv-python
+
+# === Tejas - AI Interpolation (install when needed) ===
+# numpy
+# torch
+# torchvision
