@@ -30,22 +30,30 @@ const TimelineSlider = ({ frames, currentIndex, onIndexChange }: TimelineSliderP
                 <button
                   key={frame.timestamp}
                   onClick={() => onIndexChange(i)}
-                  className="relative group"
+                  className="relative group z-10"
                 >
                   <div
-                    className={`w-2.5 h-2.5 rounded-full border-2 transition-all ${
-                      i === currentIndex
-                        ? "bg-primary border-primary scale-125"
-                        : frame.isOriginal
-                        ? "bg-card border-primary/60 hover:border-primary"
-                        : "bg-card border-border hover:border-muted-foreground"
+                    className={`w-2 h-2 rounded-full transition-all ${
+                      frame.isOriginal
+                        ? "bg-muted-foreground/50 hover:bg-muted-foreground"
+                        : "bg-border hover:bg-muted-foreground/50"
                     }`}
                   />
-                  <span className="absolute top-4 left-1/2 -translate-x-1/2 text-[10px] font-mono text-muted-foreground whitespace-nowrap">
+                  <span className="absolute top-4 left-1/2 -translate-x-1/2 text-[10px] font-mono text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                     {frame.timestamp}
                   </span>
                 </button>
               ))}
+            </div>
+
+            {/* Glowing animated marker */}
+            <div
+              className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-primary shadow-[0_0_10px_rgba(255,255,255,0.5)] rounded-full border-2 border-primary transition-all duration-300 pointer-events-none z-20 flex items-center justify-center"
+              style={{
+                left: `calc(${(currentIndex / (frames.length - 1)) * 100}% - 8px)`,
+              }}
+            >
+              <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
             </div>
           </div>
         </div>

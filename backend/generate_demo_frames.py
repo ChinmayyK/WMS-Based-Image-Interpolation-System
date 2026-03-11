@@ -33,7 +33,7 @@ def create_png(width, height, top_color, bottom_color):
     raw_data = b''
     for y in range(height):
         raw_data += b'\x00'  # filter byte
-        t = y / max(height - 1, 1)
+        t = float(y) / max(height - 1, 1)
         for x in range(width):
             tx = x / max(width - 1, 1)
             r = int(top_color[0] * (1 - t) + bottom_color[0] * t + 30 * tx)

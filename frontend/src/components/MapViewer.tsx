@@ -3,8 +3,12 @@ import Map from "ol/Map";
 import View from "ol/View";
 import TileLayer from "ol/layer/Tile";
 import ImageLayer from "ol/layer/Image";
+import VectorLayer from "ol/layer/Vector";
 import OSM from "ol/source/OSM";
 import Static from "ol/source/ImageStatic";
+import VectorSource from "ol/source/Vector";
+import GeoJSON from "ol/format/GeoJSON";
+import { Style, Stroke } from "ol/style";
 import { get as getProjection } from "ol/proj";
 import "ol/ol.css";
 import MapControlsPanel from "./MapControlsPanel";
@@ -17,15 +21,25 @@ interface MapViewerProps {
   onToggleOverlay: () => void;
   showConfidence: boolean;
   onToggleConfidence: () => void;
+  showClouds: boolean;
+  onToggleClouds: () => void;
+  showVectors: boolean;
+  onToggleVectors: () => void;
   currentFrame?: SatelliteFrame;
 }
 
 // Bounding box for the satellite overlay (EPSG:3857)
-// This covers a region roughly over India
 const OVERLAY_EXTENT = [8000000, 1800000, 9200000, 3000000];
-
 const DEFAULT_CENTER: [number, number] = [8600000, 2400000];
 const DEFAULT_ZOOM = 5;
+
+// Define a style for the optical flow motion vectors
+const vectorStyle = new Style({
+  stroke: new Stroke({
+    color: "rgba(255, 255, 0, 0.8)", // Yellow arrows
+    width: 2,
+  }),
+});
 
 const MapViewer = ({
   opacity,
@@ -33,11 +47,20 @@ const MapViewer = ({
   onToggleOverlay,
   showConfidence,
   onToggleConfidence,
+  showClouds,
+  onToggleClouds,
+  showVectors,
+  onToggleVectors,
   currentFrame,
 }: MapViewerProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<Map | null>(null);
+
+  // Layer Refs
   const overlayLayerRef = useRef<ImageLayer<Static> | null>(null);
+  const previousOverlayLayerRef = useRef<ImageLayer<Static> | null>(null);
+  const cloudLayerRef = useRef<ImageLayer<Static> | null>(null);
+  const vectorLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
 
   // Initialize map with OSM base layer
   useEffect(() => {
@@ -48,7 +71,6 @@ const MapViewer = ({
       layers: [
         new TileLayer({
           source: new OSM(),
-          opacity: 1,
         }),
       ],
       view: new View({
@@ -66,34 +88,85 @@ const MapViewer = ({
     };
   }, []);
 
-  // Update satellite overlay when currentFrame changes
+  // Frame update logic with seamless cross-fading
   useEffect(() => {
-    if (!mapInstanceRef.current) return;
+    if (!mapInstanceRef.current || !currentFrame) return;
     const map = mapInstanceRef.current;
 
-    // Remove existing overlay
-    if (overlayLayerRef.current) {
-      map.removeLayer(overlayLayerRef.current);
-      overlayLayerRef.current = null;
-    }
-
-    // Add new overlay if we have a frame with an imageUrl and overlay is enabled
-    if (currentFrame?.imageUrl && showOverlay) {
-      const imageLayer = new ImageLayer({
+    // 1. Satellite Base Overlay handling (with cross-fade)
+    if (showOverlay && currentFrame.imageUrl) {
+      // Create new layer
+      const newImageLayer = new ImageLayer({
         source: new Static({
           url: currentFrame.imageUrl,
           imageExtent: OVERLAY_EXTENT,
           projection: getProjection("EPSG:3857")!,
         }),
-        opacity: opacity,
+        opacity: 0, // Start invisible for fade-in
+        className: "transition-opacity duration-300", // CSS transition
       });
 
-      map.addLayer(imageLayer);
-      overlayLayerRef.current = imageLayer;
-    }
-  }, [currentFrame, showOverlay]);
+      map.addLayer(newImageLayer);
 
-  // Update overlay opacity separately for smooth slider interaction
+      // Trigger fade in on next frame
+      setTimeout(() => {
+        newImageLayer.setOpacity(opacity);
+      }, 50);
+
+      // Fade out and remove the old layer
+      if (overlayLayerRef.current) {
+        const oldLayer = overlayLayerRef.current;
+        oldLayer.setOpacity(0);
+        setTimeout(() => {
+          map.removeLayer(oldLayer);
+        }, 300); // Remove after transition finishes
+      }
+
+      overlayLayerRef.current = newImageLayer;
+    } else if (!showOverlay && overlayLayerRef.current) {
+      map.removeLayer(overlayLayerRef.current);
+      overlayLayerRef.current = null;
+    }
+
+    // 2. Cloud Mask Layer handling
+    if (cloudLayerRef.current) {
+      map.removeLayer(cloudLayerRef.current);
+      cloudLayerRef.current = null;
+    }
+    if (showClouds && currentFrame.cloudMaskUrl) {
+      const newCloudLayer = new ImageLayer({
+        source: new Static({
+          url: currentFrame.cloudMaskUrl,
+          imageExtent: OVERLAY_EXTENT,
+          projection: getProjection("EPSG:3857")!,
+        }),
+        opacity: 0.8,
+      });
+      map.addLayer(newCloudLayer);
+      cloudLayerRef.current = newCloudLayer;
+    }
+
+    // 3. Motion Vectors Layer handling
+    if (vectorLayerRef.current) {
+      map.removeLayer(vectorLayerRef.current);
+      vectorLayerRef.current = null;
+    }
+    if (showVectors && currentFrame.vectorsUrl) {
+      const vectorSource = new VectorSource({
+        url: currentFrame.vectorsUrl,
+        format: new GeoJSON(),
+      });
+      const newVectorLayer = new VectorLayer({
+        source: vectorSource,
+        style: vectorStyle,
+        opacity: 0.9,
+      });
+      map.addLayer(newVectorLayer);
+      vectorLayerRef.current = newVectorLayer;
+    }
+  }, [currentFrame, showOverlay, showClouds, showVectors]);
+
+  // Update overall opacity gracefully
   useEffect(() => {
     if (overlayLayerRef.current) {
       overlayLayerRef.current.setOpacity(opacity);
@@ -119,11 +192,13 @@ const MapViewer = ({
           Base Layer: OpenStreetMap
         </div>
         {currentFrame && showOverlay && (
-          <div className={`border rounded px-3 py-1.5 text-xs font-mono ${
-            currentFrame.isOriginal
-              ? "bg-green-500/20 border-green-500/40 text-green-300"
-              : "bg-blue-500/20 border-blue-500/40 text-blue-300"
-          }`}>
+          <div
+            className={`border rounded px-3 py-1.5 text-xs font-mono transition-colors ${
+              currentFrame.isOriginal
+                ? "bg-green-500/20 border-green-500/40 text-green-300"
+                : "bg-blue-500/20 border-blue-500/40 text-blue-300"
+            }`}
+          >
             Overlay: {currentFrame.timestamp} ({currentFrame.isOriginal ? "Original" : "Generated"})
           </div>
         )}
@@ -135,6 +210,10 @@ const MapViewer = ({
         onToggleOverlay={onToggleOverlay}
         showConfidence={showConfidence}
         onToggleConfidence={onToggleConfidence}
+        showClouds={showClouds}
+        onToggleClouds={onToggleClouds}
+        showVectors={showVectors}
+        onToggleVectors={onToggleVectors}
       />
 
       <LegendPanel />

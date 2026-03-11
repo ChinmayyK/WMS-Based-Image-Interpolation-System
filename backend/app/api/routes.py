@@ -14,12 +14,16 @@ FRAME_CATALOG = [
     {
         "timestamp": "10:00",
         "imageUrl": "/data/raw_frames/frame_10_00.png",
+        "cloudMaskUrl": "/data/cloud_masks/frame_10_00_cloud.png",
+        "vectorsUrl": "/data/motion_vectors/frame_10_00_vectors.json",
         "isOriginal": True,
         "confidence": 1.0,
     },
     {
         "timestamp": "10:05",
         "imageUrl": "/data/interpolated_frames/frame_10_05.png",
+        "cloudMaskUrl": "/data/cloud_masks/frame_10_05_cloud.png",
+        "vectorsUrl": "/data/motion_vectors/frame_10_05_vectors.json",
         "isOriginal": False,
         "confidence": 0.94,
         "sourceFrames": ["10:00", "10:30"],
@@ -27,6 +31,8 @@ FRAME_CATALOG = [
     {
         "timestamp": "10:10",
         "imageUrl": "/data/interpolated_frames/frame_10_10.png",
+        "cloudMaskUrl": "/data/cloud_masks/frame_10_10_cloud.png",
+        "vectorsUrl": "/data/motion_vectors/frame_10_10_vectors.json",
         "isOriginal": False,
         "confidence": 0.87,
         "sourceFrames": ["10:00", "10:30"],
@@ -34,6 +40,8 @@ FRAME_CATALOG = [
     {
         "timestamp": "10:15",
         "imageUrl": "/data/interpolated_frames/frame_10_15.png",
+        "cloudMaskUrl": "/data/cloud_masks/frame_10_15_cloud.png",
+        "vectorsUrl": "/data/motion_vectors/frame_10_15_vectors.json",
         "isOriginal": False,
         "confidence": 0.82,
         "sourceFrames": ["10:00", "10:30"],
@@ -41,6 +49,8 @@ FRAME_CATALOG = [
     {
         "timestamp": "10:20",
         "imageUrl": "/data/interpolated_frames/frame_10_20.png",
+        "cloudMaskUrl": "/data/cloud_masks/frame_10_20_cloud.png",
+        "vectorsUrl": "/data/motion_vectors/frame_10_20_vectors.json",
         "isOriginal": False,
         "confidence": 0.89,
         "sourceFrames": ["10:00", "10:30"],
@@ -48,6 +58,8 @@ FRAME_CATALOG = [
     {
         "timestamp": "10:25",
         "imageUrl": "/data/interpolated_frames/frame_10_25.png",
+        "cloudMaskUrl": "/data/cloud_masks/frame_10_25_cloud.png",
+        "vectorsUrl": "/data/motion_vectors/frame_10_25_vectors.json",
         "isOriginal": False,
         "confidence": 0.91,
         "sourceFrames": ["10:00", "10:30"],
@@ -55,6 +67,8 @@ FRAME_CATALOG = [
     {
         "timestamp": "10:30",
         "imageUrl": "/data/raw_frames/frame_10_30.png",
+        "cloudMaskUrl": "/data/cloud_masks/frame_10_30_cloud.png",
+        "vectorsUrl": "/data/motion_vectors/frame_10_30_vectors.json",
         "isOriginal": True,
         "confidence": 1.0,
     },

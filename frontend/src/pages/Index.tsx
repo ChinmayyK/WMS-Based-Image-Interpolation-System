@@ -24,6 +24,8 @@ const Index = () => {
   const [toggleView, setToggleView] = useState<"original" | "generated">("original");
   const [showOverlay, setShowOverlay] = useState(true);
   const [showConfidence, setShowConfidence] = useState(false);
+  const [showClouds, setShowClouds] = useState(false);
+  const [showVectors, setShowVectors] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
   const currentFrame = frames[currentIndex];
@@ -149,6 +151,10 @@ const Index = () => {
                   onToggleOverlay={() => setShowOverlay(!showOverlay)}
                   showConfidence={showConfidence}
                   onToggleConfidence={() => setShowConfidence(!showConfidence)}
+                  showClouds={showClouds}
+                  onToggleClouds={() => setShowClouds(!showClouds)}
+                  showVectors={showVectors}
+                  onToggleVectors={() => setShowVectors(!showVectors)}
                   currentFrame={currentFrame}
                 />
               </div>
@@ -162,6 +168,10 @@ const Index = () => {
                   onToggleOverlay={() => setShowOverlay(!showOverlay)}
                   showConfidence={showConfidence}
                   onToggleConfidence={() => setShowConfidence(!showConfidence)}
+                  showClouds={showClouds}
+                  onToggleClouds={() => setShowClouds(!showClouds)}
+                  showVectors={showVectors}
+                  onToggleVectors={() => setShowVectors(!showVectors)}
                   currentFrame={currentFrame}
                 />
               </div>
@@ -181,6 +191,10 @@ const Index = () => {
                   onToggleOverlay={() => setShowOverlay(!showOverlay)}
                   showConfidence={showConfidence}
                   onToggleConfidence={() => setShowConfidence(!showConfidence)}
+                  showClouds={showClouds}
+                  onToggleClouds={() => setShowClouds(!showClouds)}
+                  showVectors={showVectors}
+                  onToggleVectors={() => setShowVectors(!showVectors)}
                   currentFrame={currentFrame}
                 />
               </div>

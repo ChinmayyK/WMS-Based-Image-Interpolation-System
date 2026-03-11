@@ -1,6 +1,8 @@
 export interface SatelliteFrame {
   timestamp: string;
   imageUrl: string;
+  cloudMaskUrl?: string;
+  vectorsUrl?: string;
   isOriginal: boolean;
   confidence: number;
   sourceFrames?: [string, string];
