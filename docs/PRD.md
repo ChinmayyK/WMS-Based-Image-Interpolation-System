@@ -43,14 +43,14 @@ The primary objectives of the system are:
 
 # 4. Target Users
 
-The system is designed for users who need to analyze satellite imagery and environmental changes over time.
+The system is engineered specifically to cater to Indian industries and organizations that require robust geospatial and intelligence tools.
 
 Primary users include:
 
-* Meteorologists
-* Environmental researchers
-* Disaster monitoring teams
-* Geospatial analysts
+* The Indian Meteorological Department (IMD) for continuous weather tracking
+* ISRO and Geospatial analysts for environmental research
+* Indian Defense teams for border and strategic surveillance
+* Disaster monitoring teams dealing with monsoons and localized events
 * Students and researchers studying satellite imagery
 
 ---

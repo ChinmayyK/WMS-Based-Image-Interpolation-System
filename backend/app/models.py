@@ -1,8 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 
 class FrameRetrievalRequest(BaseModel):
-    bbox: List[float] # [minx, miny, maxx, maxy]
+    bbox: List[float] = Field(default=[68.111378, 6.753515, 97.395561, 35.674545]) # Default bounding box for India
     start_time: str
     end_time: str
     layers: str
