@@ -9,7 +9,7 @@ export const MOCK_FRAMES: SatelliteFrame[] = [
   },
   {
     timestamp: "10:05",
-    imageUrl: "",
+    imageUrl: "/data/interpolated_frames/frame_10_05.png",
     isOriginal: false,
     confidence: 0.94,
     sourceFrames: ["10:00", "10:30"],
@@ -23,21 +23,21 @@ export const MOCK_FRAMES: SatelliteFrame[] = [
   },
   {
     timestamp: "10:15",
-    imageUrl: "",
+    imageUrl: "/data/interpolated_frames/frame_10_15.png",
     isOriginal: false,
     confidence: 0.82,
     sourceFrames: ["10:00", "10:30"],
   },
   {
     timestamp: "10:20",
-    imageUrl: "",
+    imageUrl: "/data/interpolated_frames/frame_10_20.png",
     isOriginal: false,
     confidence: 0.89,
     sourceFrames: ["10:00", "10:30"],
   },
   {
     timestamp: "10:25",
-    imageUrl: "",
+    imageUrl: "/data/interpolated_frames/frame_10_25.png",
     isOriginal: false,
     confidence: 0.91,
     sourceFrames: ["10:00", "10:30"],

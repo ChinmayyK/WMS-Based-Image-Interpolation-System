@@ -8,9 +8,10 @@ import CurrentTimeDisplay from "@/components/CurrentTimeDisplay";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import ErrorPanel from "@/components/ErrorPanel";
 import { MOCK_FRAMES } from "@/lib/mock-data";
-import { PlaybackSpeed, ComparisonMode, DataSource } from "@/lib/types";
+import { SatelliteFrame, PlaybackSpeed, ComparisonMode, DataSource } from "@/lib/types";
 
 const Index = () => {
+  const [frames, setFrames] = useState<SatelliteFrame[]>(MOCK_FRAMES);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState<PlaybackSpeed>(1.0);
@@ -25,7 +26,6 @@ const Index = () => {
   const [showConfidence, setShowConfidence] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
-  const frames = MOCK_FRAMES;
   const currentFrame = frames[currentIndex];
 
   // Simulate loading on mount
@@ -64,19 +64,50 @@ const Index = () => {
     };
   }, [isPlaying, speed, goNext]);
 
+  // Fetch frames from API
+  const fetchFromApi = useCallback(async () => {
+    setIsLoading(true);
+    setLoadProgress(0);
+    setError(null);
+
+    try {
+      setLoadProgress(30);
+      const response = await fetch("/api/frames");
+
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
+      }
+
+      setLoadProgress(70);
+      const data = await response.json();
+
+      if (data.status === "success" && data.frames?.length > 0) {
+        setFrames(data.frames);
+        setCurrentIndex(0);
+        setLoadProgress(100);
+        setTimeout(() => setIsLoading(false), 300);
+      } else {
+        throw new Error("No frames returned from API");
+      }
+    } catch (err) {
+      setIsLoading(false);
+      setError(
+        err instanceof Error
+          ? `API Error: ${err.message}`
+          : "Unable to fetch frames. Check backend connection."
+      );
+    }
+  }, []);
+
   const handleToggleDataSource = useCallback(() => {
     const next = dataSource === "demo" ? "api" : "demo";
     setDataSource(next);
     if (next === "api") {
-      setIsLoading(true);
-      setLoadProgress(0);
-      // Simulate API failure for demo
-      setTimeout(() => {
-        setIsLoading(false);
-        setError("Unable to fetch frames. Check backend connection.");
-      }, 2000);
+      fetchFromApi();
     } else {
       setError(null);
+      setFrames(MOCK_FRAMES);
+      setCurrentIndex(0);
       setIsLoading(true);
       setLoadProgress(0);
       setTimeout(() => {
@@ -84,17 +115,11 @@ const Index = () => {
         setTimeout(() => setIsLoading(false), 200);
       }, 800);
     }
-  }, [dataSource]);
+  }, [dataSource, fetchFromApi]);
 
   const handleRetry = useCallback(() => {
-    setError(null);
-    setIsLoading(true);
-    setLoadProgress(0);
-    setTimeout(() => {
-      setIsLoading(false);
-      setError("Unable to fetch frames. Check backend connection.");
-    }, 2000);
-  }, []);
+    fetchFromApi();
+  }, [fetchFromApi]);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
@@ -124,6 +149,7 @@ const Index = () => {
                   onToggleOverlay={() => setShowOverlay(!showOverlay)}
                   showConfidence={showConfidence}
                   onToggleConfidence={() => setShowConfidence(!showConfidence)}
+                  currentFrame={currentFrame}
                 />
               </div>
               <div className="flex-1 relative">
@@ -136,6 +162,7 @@ const Index = () => {
                   onToggleOverlay={() => setShowOverlay(!showOverlay)}
                   showConfidence={showConfidence}
                   onToggleConfidence={() => setShowConfidence(!showConfidence)}
+                  currentFrame={currentFrame}
                 />
               </div>
             </div>
@@ -154,6 +181,7 @@ const Index = () => {
                   onToggleOverlay={() => setShowOverlay(!showOverlay)}
                   showConfidence={showConfidence}
                   onToggleConfidence={() => setShowConfidence(!showConfidence)}
+                  currentFrame={currentFrame}
                 />
               </div>
             )
