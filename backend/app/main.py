@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.api.routes import router as api_router
+import os
 
 app = FastAPI(title="WMS-Based Image Interpolation System API")
 
@@ -12,6 +14,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Setup path to data directories relative to current file
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+app.mount("/data", StaticFiles(directory=DATA_DIR), name="data")
 
 app.include_router(api_router, prefix="/api")
 
