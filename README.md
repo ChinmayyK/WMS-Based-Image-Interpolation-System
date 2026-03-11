@@ -13,22 +13,27 @@ A full-stack research prototype for fetching satellite images from WMS, preproce
 ## Setup & Run Instructions
 
 ### 1. Running on your device a cloned repo
-Since the environment and virtual environments are already set up on your machine, you can simply run the application:
-```bash
-make run-backend
-make run-frontend
+Since the environment and virtual environments are already set up on your machine, you can simply run the application using the PowerShell script:
+```powershell
+.\scripts\run_pipeline.ps1
 ```
 
-*(Alternatively, use `./scripts/run_pipeline.sh` if you prefer to launch both together).*
+*(For Linux/MacOS: run `./scripts/run_pipeline.sh` or `make run-backend` / `make run-frontend`).*
 
 ### 2. Setting up from a fresh clone
 If someone else clones this repository, they need to install the dependencies first before running. 
-They should execute:
-```bash
+On Windows, they should execute:
+```powershell
 # 1. Setup the environment (installs python and node dependencies)
-make setup
+.\scripts\setup_env.ps1
 
 # 2. Run the application
+.\scripts\run_pipeline.ps1
+```
+
+On Linux/MacOS:
+```bash
+make setup
 make run-backend
 make run-frontend
 ```
