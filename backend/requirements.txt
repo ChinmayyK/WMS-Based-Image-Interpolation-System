@@ -10,9 +10,9 @@ responses
 # owslib
 # rasterio
 # gdal
-# opencv-python
+opencv-python
 
 # === Tejas - AI Interpolation (install when needed) ===
-# numpy
+numpy
 # torch
 # torchvision
