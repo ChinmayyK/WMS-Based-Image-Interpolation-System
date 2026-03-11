@@ -1,0 +1,7 @@
+{
+  "time": "10:10",
+  "generated": true,
+  "confidence": 0.87,
+  "source_frames": ["10:00", "10:30"],
+  "filepath": "/data/interpolated_frames/frame_10_10.png"
+}
