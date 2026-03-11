@@ -1,19 +1,67 @@
 import os
+import requests
+import uuid
+from typing import List
 from app.models import FrameRetrievalRequest
 
-def fetch_wms_frames(request: FrameRetrievalRequest):
-    \"\"\"
-    Placeholder for WMS Data Acquisition module.
-    Ideally uses owslib.wms.WebMapService to fetch images.
-    \"\"\"
-    # Mock behavior
-    print(f"Fetching WMS layers {request.layers} for bbox {request.bbox}")
+class WMSClientError(Exception):
+    pass
+
+def fetch_wms_frames(request: FrameRetrievalRequest) -> List[dict]:
+    """
+    Fetches satellite imagery frames from a Web Map Service (WMS)
+    for the given request parameters.
+    """
+    # Use a default open WMS endpoint if not specified, e.g., NASA GIBS for test purposes (Blue Marble)
+    wms_url = os.getenv("WMS_URL", "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi")
     
-    # Ensure data directory exists
-    data_dir = os.path.join(os.path.dirname(__file__), "../data")
+    data_dir = os.path.join(os.path.dirname(__file__), "../data/frames")
     os.makedirs(data_dir, exist_ok=True)
     
-    return [
-        {"id": "frame_1", "timestamp": request.start_time, "path": f"{data_dir}/frame_1.png"},
-        {"id": "frame_2", "timestamp": request.end_time, "path": f"{data_dir}/frame_2.png"}
-    ]
+    # Example format: minx, miny, maxx, maxy
+    bbox_str = ",".join(map(str, request.bbox))
+    
+    retrieved_frames = []
+    
+    time_points = [request.start_time, request.end_time]
+    
+    for t in time_points:
+        params = {
+            "SERVICE": "WMS",
+            "VERSION": "1.3.0",
+            "REQUEST": "GetMap",
+            "LAYERS": request.layers,
+            "STYLES": "",
+            "CRS": request.crs,
+            "BBOX": bbox_str,
+            "WIDTH": str(request.width),
+            "HEIGHT": str(request.height),
+            "FORMAT": "image/png",
+            "TIME": t,
+            "TRANSPARENT": "TRUE"
+        }
+        
+        try:
+            response = requests.get(wms_url, params=params)
+            response.raise_for_status()
+            
+            if "image" not in response.headers.get("Content-Type", ""):
+                raise WMSClientError(f"Unexpected content type from WMS: {response.headers.get('Content-Type')}")
+
+            frame_id = f"frame_{uuid.uuid4().hex[:8]}"
+            filename = f"{frame_id}_{t.replace(':', '').replace('-', '')}.png"
+            filepath = os.path.join(data_dir, filename)
+            
+            with open(filepath, "wb") as f:
+                f.write(response.content)
+                
+            retrieved_frames.append({
+                "id": frame_id,
+                "timestamp": t,
+                "path": filepath
+            })
+            
+        except requests.exceptions.RequestException as e:
+            raise WMSClientError(f"Failed to fetch WMS data for time {t}: {e}")
+            
+    return retrieved_frames

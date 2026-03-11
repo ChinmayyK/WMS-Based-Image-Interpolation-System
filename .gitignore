@@ -18,3 +18,7 @@ venv/
 # Data
 backend/app/data/*
 !backend/app/data/.keep
+
+# Hrishikesh's personal files
+hrishikesh_tasks.md
+hrishikesh_modifications_log.md

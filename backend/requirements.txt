@@ -4,6 +4,9 @@ uvicorn[standard]
 pydantic
 
 # === Hrishikesh - WMS & Preprocessing (install when needed) ===
+requests
+pytest
+responses
 # owslib
 # rasterio
 # gdal
