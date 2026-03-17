@@ -22,83 +22,101 @@ const MapControlsPanel = ({
   onToggleVectors,
 }: MapControlsPanelProps) => {
   return (
-    <div className="absolute top-4 right-4 z-10 bg-panel/80 backdrop-blur-md border border-border/50 rounded-sm p-4 w-52 shadow-2xl transition-all duration-300">
-      <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono mb-3 border-b border-border/50 pb-2">
-        Layer Management
-      </h3>
-      
-      <div className="space-y-3 font-mono">
+    <div className="absolute top-6 right-6 z-10 glass p-5 w-64 rounded-xl flex flex-col gap-6 shadow-2xl">
+      {/* Category: Scene Controls */}
+      <div>
+        <h3 className="text-[10px] uppercase tracking-[0.2em] text-primary/70 font-bold mb-3">System Controls</h3>
         <button
           onClick={onResetView}
-          className="w-full text-left px-2 py-1.5 text-[11px] text-foreground hover:bg-white/5 hover:text-primary rounded-sm transition-colors flex items-center gap-2"
+          className="w-full h-9 flex items-center justify-between px-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all border border-white/5 active:scale-95 group"
         >
-          <div className="w-1 h-1 rounded-full bg-primary/50" />
-          Reset Coordinates
+          <span className="text-[11px] font-medium text-foreground group-hover:text-primary transition-colors">Reset Viewport</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(34,211,238,0.6)] animate-pulse" />
         </button>
-        
-        <div className="border-t border-border/30 my-2" />
-        
-        <label className="flex items-center justify-between group cursor-pointer px-2 py-1 rounded-sm hover:bg-white/5 transition-colors">
-          <span className="text-[11px] text-foreground group-hover:text-primary transition-colors">Satellite Overlay</span>
-          <div className="relative">
-            <input
-              type="checkbox"
-              checked={showOverlay}
-              onChange={onToggleOverlay}
-              className="sr-only"
-            />
-            <div className={`w-6 h-3 rounded-full transition-colors ${showOverlay ? "bg-primary/50" : "bg-muted"}`}>
-              <div className={`absolute top-0.5 left-0.5 w-2 h-2 rounded-full bg-white transition-transform ${showOverlay ? "translate-x-3" : ""}`} />
-            </div>
-          </div>
-        </label>
-        
-        <label className="flex items-center justify-between group cursor-pointer px-2 py-1 rounded-sm hover:bg-white/5 transition-colors">
-          <span className="text-[11px] text-foreground group-hover:text-primary transition-colors">Confidence Mask</span>
-          <div className="relative">
-            <input
-              type="checkbox"
-              checked={showConfidence}
-              onChange={onToggleConfidence}
-              className="sr-only"
-            />
-            <div className={`w-6 h-3 rounded-full transition-colors ${showConfidence ? "bg-primary/50" : "bg-muted"}`}>
-              <div className={`absolute top-0.5 left-0.5 w-2 h-2 rounded-full bg-white transition-transform ${showConfidence ? "translate-x-3" : ""}`} />
-            </div>
-          </div>
-        </label>
+      </div>
 
-        <label className="flex items-center justify-between group cursor-pointer px-2 py-1 rounded-sm hover:bg-white/5 transition-colors">
-          <span className="text-[11px] text-yellow-500/80 group-hover:text-yellow-400 transition-colors">Optical Flow (Vectors)</span>
-           <div className="relative">
-            <input
-              type="checkbox"
-              checked={showVectors}
-              onChange={onToggleVectors}
-              className="sr-only"
-            />
-            <div className={`w-6 h-3 rounded-full transition-colors ${showVectors ? "bg-yellow-500/50" : "bg-muted"}`}>
-              <div className={`absolute top-0.5 left-0.5 w-2 h-2 rounded-full bg-white transition-transform ${showVectors ? "translate-x-3" : ""}`} />
-            </div>
-          </div>
-        </label>
+      {/* Category: Satellite Data */}
+      <div className="flex flex-col gap-3">
+        <h3 className="text-[10px] uppercase tracking-[0.2em] text-primary/70 font-bold mb-1">Observation Data</h3>
+        <div className="flex flex-col gap-1">
+          <LayerToggle 
+            label="Satellite Imagery" 
+            description="L1B Corrected Reflectance"
+            checked={showOverlay} 
+            onChange={onToggleOverlay} 
+            color="primary" 
+          />
+          <LayerToggle 
+            label="Confidence Matrix" 
+            description="Statistical Uncertainty"
+            checked={showConfidence} 
+            onChange={onToggleConfidence} 
+            color="primary" 
+          />
+        </div>
+      </div>
 
-        <label className="flex items-center justify-between group cursor-pointer px-2 py-1 rounded-sm hover:bg-white/5 transition-colors">
-          <span className="text-[11px] text-blue-400/80 group-hover:text-blue-300 transition-colors">Cloud Segmentation</span>
-          <div className="relative">
-            <input
-              type="checkbox"
-              checked={showClouds}
-              onChange={onToggleClouds}
-              className="sr-only"
-            />
-            <div className={`w-6 h-3 rounded-full transition-colors ${showClouds ? "bg-blue-400/50" : "bg-muted"}`}>
-              <div className={`absolute top-0.5 left-0.5 w-2 h-2 rounded-full bg-white transition-transform ${showClouds ? "translate-x-3" : ""}`} />
-            </div>
-          </div>
-        </label>
+      {/* Category: AI Analytics */}
+      <div className="flex flex-col gap-3">
+        <h3 className="text-[10px] uppercase tracking-[0.2em] text-primary/70 font-bold mb-1">AI Deep Analytics</h3>
+        <div className="flex flex-col gap-1">
+          <LayerToggle 
+            label="Optical Flow" 
+            description="Motion Vector Analysis"
+            checked={showVectors} 
+            onChange={onToggleVectors} 
+            color="yellow" 
+          />
+          <LayerToggle 
+            label="Cloud Segments" 
+            description="Neural Classification"
+            checked={showClouds} 
+            onChange={onToggleClouds} 
+            color="blue" 
+          />
+        </div>
       </div>
     </div>
+  );
+};
+
+interface LayerToggleProps {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: () => void;
+  color: 'primary' | 'yellow' | 'blue';
+}
+
+const LayerToggle = ({ label, description, checked, onChange, color }: LayerToggleProps) => {
+  const colorMap = {
+    primary: 'bg-primary shadow-[0_0_8px_rgba(34,211,238,0.4)]',
+    yellow: 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]',
+    blue: 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]',
+  };
+
+  return (
+    <label className="flex items-center justify-between group cursor-pointer p-2 rounded-lg hover:bg-white/5 transition-all outline-none focus-within:bg-white/5">
+      <div className="flex flex-col">
+        <span className={`text-[11px] font-bold transition-colors ${checked ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/80'}`}>
+          {label}
+        </span>
+        <span className="text-[9px] text-muted-foreground/60 group-hover:text-muted-foreground/80 lowercase italic font-mono">
+          {description}
+        </span>
+      </div>
+      <div className="relative">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onChange}
+          className="sr-only"
+        />
+        <div className={`w-8 h-4 rounded-full transition-all border border-white/10 ${checked ? 'bg-white/10' : 'bg-black/40'}`}>
+          <div className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full transition-all duration-300 shadow-lg ${checked ? `translate-x-4 ${colorMap[color]}` : 'bg-white/20'}`} />
+        </div>
+      </div>
+    </label>
   );
 };
 

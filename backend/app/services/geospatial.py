@@ -38,6 +38,29 @@ def save_preprocessed_image(img_array: np.ndarray, output_path: str):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     cv2.imwrite(output_path, to_save)
 
+def apply_transparency(image_path: str, output_path: str = None):
+    """
+    Converts black pixels (RGB 0,0,0) to alpha transparency.
+    """
+    img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+    if img is None:
+        return
+    
+    if img.shape[2] == 3:
+        # Add alpha channel
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+        
+    # Mask black pixels (where R=0, G=0, B=0)
+    # Using a small threshold to avoid issues with near-black noise
+    threshold = 5
+    black_pixels = np.all(img[:, :, :3] <= threshold, axis=2)
+    img[black_pixels, 3] = 0
+    
+    if output_path is None:
+        output_path = image_path
+        
+    cv2.imwrite(output_path, img)
+
 def align_crs(source_crs: str, target_crs: str="EPSG:4326"):
     """
     In a full GIS context, this would use rasterio.warp to reproject.

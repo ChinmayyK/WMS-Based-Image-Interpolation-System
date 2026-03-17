@@ -126,124 +126,125 @@ const Index = () => {
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground selection:bg-primary/30">
       <DashboardHeader dataSource={dataSource} onToggleDataSource={handleToggleDataSource} />
 
-      <div className="flex flex-1 min-h-0 relative">
-        {/* Main Map Area - Full Screen */}
-        <div className="flex-1 relative bg-map-bg">
-          {isLoading && (
-            <LoadingOverlay
-              message={loadProgress < 100 ? "INITIALIZING DATA STREAM…" : "SYNCHRONIZING SENSORS…"}
-              progress={loadProgress}
-            />
-          )}
-          {error && <ErrorPanel message={error} onRetry={handleRetry} />}
+      <main className="flex flex-1 min-h-0 relative px-4 pb-4 gap-4">
+        {/* Main Observation Area (80% roughly) */}
+        <div className="flex-[4] flex flex-col min-w-0 gap-4">
+          <div className="flex-1 min-h-0 relative glass rounded-xl overflow-hidden border-white/10">
+            {isLoading && (
+              <LoadingOverlay
+                message={loadProgress < 100 ? "INITIALIZING DATA STREAM…" : "SYNCHRONIZING SENSORS…"}
+                progress={loadProgress}
+              />
+            )}
+            {error && <ErrorPanel message={error} onRetry={handleRetry} />}
 
-          {/* Map Viewer Rendering */}
-          {comparisonMode === "split" && !error && !isLoading ? (
-            <div className="flex w-full h-full gap-1">
-              <div className="flex-1 relative">
-                <div className="absolute top-1 left-1 z-10 bg-card/85 border rounded px-2 py-0.5 text-[10px] font-mono text-muted-foreground">
-                  Original Frame
-                </div>
-                <MapViewer
-                  opacity={opacity}
-                  showOverlay={showOverlay}
-                  onToggleOverlay={() => setShowOverlay(!showOverlay)}
-                  showConfidence={showConfidence}
-                  onToggleConfidence={() => setShowConfidence(!showConfidence)}
-                  showClouds={showClouds}
-                  onToggleClouds={() => setShowClouds(!showClouds)}
-                  showVectors={showVectors}
-                  onToggleVectors={() => setShowVectors(!showVectors)}
-                  currentFrame={currentFrame}
-                />
-              </div>
-              <div className="flex-1 relative">
-                <div className="absolute top-1 left-1 z-10 bg-card/85 border rounded px-2 py-0.5 text-[10px] font-mono text-primary">
-                  Generated Frame
-                </div>
-                <MapViewer
-                  opacity={opacity}
-                  showOverlay={showOverlay}
-                  onToggleOverlay={() => setShowOverlay(!showOverlay)}
-                  showConfidence={showConfidence}
-                  onToggleConfidence={() => setShowConfidence(!showConfidence)}
-                  showClouds={showClouds}
-                  onToggleClouds={() => setShowClouds(!showClouds)}
-                  showVectors={showVectors}
-                  onToggleVectors={() => setShowVectors(!showVectors)}
-                  currentFrame={currentFrame}
-                />
-              </div>
-            </div>
-          ) : (
-            !error &&
-            !isLoading && (
+            {/* Map Frame Rendering */}
+            {!error && !isLoading && (
               <div className="w-full h-full relative">
-                {comparisonMode === "toggle" && (
-                  <div className="absolute top-1 left-14 z-10 bg-card/85 border rounded px-2 py-0.5 text-[10px] font-mono text-primary">
-                    Viewing: {toggleView === "original" ? "Original" : "Generated"}
+                {comparisonMode === "split" ? (
+                  <div className="flex w-full h-full gap-2 p-2">
+                    <div className="flex-1 relative rounded-lg overflow-hidden border border-white/5">
+                      <div className="absolute top-3 left-3 z-10 glass px-2 py-1 rounded text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+                        Original
+                      </div>
+                      <MapViewer
+                        opacity={opacity}
+                        showOverlay={showOverlay}
+                        onToggleOverlay={() => setShowOverlay(!showOverlay)}
+                        showConfidence={showConfidence}
+                        onToggleConfidence={() => setShowConfidence(!showConfidence)}
+                        showClouds={showClouds}
+                        onToggleClouds={() => setShowClouds(!showClouds)}
+                        showVectors={showVectors}
+                        onToggleVectors={() => setShowVectors(!showVectors)}
+                        currentFrame={currentFrame}
+                        comparisonMode="split"
+                      />
+                    </div>
+                    <div className="flex-1 relative rounded-lg overflow-hidden border border-primary/20">
+                      <div className="absolute top-3 left-3 z-10 glass px-2 py-1 rounded text-[10px] font-mono text-primary uppercase tracking-widest">
+                        AI Processed
+                      </div>
+                      <MapViewer
+                        opacity={opacity}
+                        showOverlay={showOverlay}
+                        onToggleOverlay={() => setShowOverlay(!showOverlay)}
+                        showConfidence={showConfidence}
+                        onToggleConfidence={() => setShowConfidence(!showConfidence)}
+                        showClouds={showClouds}
+                        onToggleClouds={() => setShowClouds(!showClouds)}
+                        showVectors={showVectors}
+                        onToggleVectors={() => setShowVectors(!showVectors)}
+                        currentFrame={currentFrame}
+                        comparisonMode="split"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <MapViewer
+                    opacity={opacity}
+                    showOverlay={showOverlay}
+                    onToggleOverlay={() => setShowOverlay(!showOverlay)}
+                    showConfidence={showConfidence}
+                    onToggleConfidence={() => setShowConfidence(!showConfidence)}
+                    showClouds={showClouds}
+                    onToggleClouds={() => setShowClouds(!showClouds)}
+                    showVectors={showVectors}
+                    onToggleVectors={() => setShowVectors(!showVectors)}
+                    currentFrame={currentFrame}
+                    comparisonMode={comparisonMode}
+                  />
+                )}
+
+                {/* No frame fallback */}
+                {!currentFrame && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-md z-50">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+                      <p className="text-xs tracking-[0.2em] uppercase font-mono text-primary animate-pulse">Establishing Satellite Link...</p>
+                    </div>
                   </div>
                 )}
-                <MapViewer
-                  opacity={opacity}
-                  showOverlay={showOverlay}
-                  onToggleOverlay={() => setShowOverlay(!showOverlay)}
-                  showConfidence={showConfidence}
-                  onToggleConfidence={() => setShowConfidence(!showConfidence)}
-                  showClouds={showClouds}
-                  onToggleClouds={() => setShowClouds(!showClouds)}
-                  showVectors={showVectors}
-                  onToggleVectors={() => setShowVectors(!showVectors)}
-                  currentFrame={currentFrame}
-                />
               </div>
-            )
-          )}
+            )}
+          </div>
 
-          {/* No frame fallback */}
-          {!isLoading && !error && !currentFrame && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/90 backdrop-blur-sm z-50">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                <p className="text-[10px] tracking-widest uppercase font-mono text-primary animate-pulse">Waiting for telemetry</p>
-              </div>
+          {/* Bottom Timeline Control */}
+          <div className="glass rounded-xl p-6 shadow-2xl">
+            <TimelineSlider
+              frames={frames}
+              currentIndex={currentIndex}
+              onIndexChange={setCurrentIndex}
+            />
+            <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
+              <AnimationControls
+                isPlaying={isPlaying}
+                onPlayPause={() => setIsPlaying(!isPlaying)}
+                onNext={goNext}
+                onPrev={goPrev}
+                speed={speed}
+                onSpeedChange={setSpeed}
+                opacity={opacity}
+                onOpacityChange={setOpacity}
+              />
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Right-Side Dashboard Frame Info */}
-        <FrameInfoPanel
-          frame={currentFrame}
-          frameIndex={currentIndex}
-          totalFrames={frames.length}
-          comparisonMode={comparisonMode}
-          onComparisonModeChange={setComparisonMode}
-          toggleView={toggleView}
-          onToggleViewChange={setToggleView}
-          isDemoMode={dataSource === "demo"}
-        />
-      </div>
-
-      {/* Bottom Timeline & Playback Control Bar */}
-      <div className="border-t border-border/50 bg-panel/95 backdrop-blur px-8 py-4 z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col gap-4">
-        <TimelineSlider
-          frames={frames}
-          currentIndex={currentIndex}
-          onIndexChange={setCurrentIndex}
-        />
-        <div className="flex items-center justify-between border-t border-border/30 pt-3">
-          <AnimationControls
-            isPlaying={isPlaying}
-            onPlayPause={() => setIsPlaying(!isPlaying)}
-            onNext={goNext}
-            onPrev={goPrev}
-            speed={speed}
-            onSpeedChange={setSpeed}
-            opacity={opacity}
-            onOpacityChange={setOpacity}
+        {/* Right Dashboard Sidebar (20% roughly) */}
+        <aside className="flex-1 min-w-[320px] flex flex-col gap-4">
+          <FrameInfoPanel
+            frame={currentFrame}
+            frameIndex={currentIndex}
+            totalFrames={frames.length}
+            comparisonMode={comparisonMode}
+            onComparisonModeChange={setComparisonMode}
+            toggleView={toggleView}
+            onToggleViewChange={setToggleView}
+            isDemoMode={dataSource === "demo"}
           />
-        </div>
-      </div>
+        </aside>
+      </main>
     </div>
   );
 };

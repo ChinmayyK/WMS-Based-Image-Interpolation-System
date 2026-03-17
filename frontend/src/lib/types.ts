@@ -6,6 +6,7 @@ export interface SatelliteFrame {
   isOriginal: boolean;
   confidence: number;
   sourceFrames?: [string, string];
+  bbox?: [number, number, number, number];
 }
 
 export type PlaybackSpeed = 0.5 | 1.0 | 1.5 | 2.0;

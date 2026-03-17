@@ -35,8 +35,8 @@ def fetch_wms_frames(request: FrameRetrievalRequest) -> List[dict]:
             "STYLES": "",
             "CRS": request.crs,
             "BBOX": bbox_str,
-            "WIDTH": str(request.width),
-            "HEIGHT": str(request.height),
+            "WIDTH": str(request.width if request.width > 512 else 1024),
+            "HEIGHT": str(request.height if request.height > 512 else 1024),
             "FORMAT": "image/png",
             "TIME": t,
             "TRANSPARENT": "TRUE"

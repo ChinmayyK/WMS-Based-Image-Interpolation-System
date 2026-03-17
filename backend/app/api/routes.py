@@ -18,6 +18,7 @@ FRAME_CATALOG = [
         "vectorsUrl": "/data/motion_vectors/frame_10_00_vectors.json",
         "isOriginal": True,
         "confidence": 1.0,
+        "bbox": [68.1, 6.7, 97.4, 35.7],
     },
     {
         "timestamp": "10:05",
@@ -27,6 +28,7 @@ FRAME_CATALOG = [
         "isOriginal": False,
         "confidence": 0.94,
         "sourceFrames": ["10:00", "10:30"],
+        "bbox": [68.1, 6.7, 97.4, 35.7],
     },
     {
         "timestamp": "10:10",
@@ -36,6 +38,7 @@ FRAME_CATALOG = [
         "isOriginal": False,
         "confidence": 0.87,
         "sourceFrames": ["10:00", "10:30"],
+        "bbox": [68.1, 6.7, 97.4, 35.7],
     },
     {
         "timestamp": "10:15",
@@ -45,6 +48,7 @@ FRAME_CATALOG = [
         "isOriginal": False,
         "confidence": 0.82,
         "sourceFrames": ["10:00", "10:30"],
+        "bbox": [68.1, 6.7, 97.4, 35.7],
     },
     {
         "timestamp": "10:20",
@@ -54,6 +58,7 @@ FRAME_CATALOG = [
         "isOriginal": False,
         "confidence": 0.89,
         "sourceFrames": ["10:00", "10:30"],
+        "bbox": [68.1, 6.7, 97.4, 35.7],
     },
     {
         "timestamp": "10:25",
@@ -63,6 +68,7 @@ FRAME_CATALOG = [
         "isOriginal": False,
         "confidence": 0.91,
         "sourceFrames": ["10:00", "10:30"],
+        "bbox": [68.1, 6.7, 97.4, 35.7],
     },
     {
         "timestamp": "10:30",
@@ -71,6 +77,7 @@ FRAME_CATALOG = [
         "vectorsUrl": "/data/motion_vectors/frame_10_30_vectors.json",
         "isOriginal": True,
         "confidence": 1.0,
+        "bbox": [68.1, 6.7, 97.4, 35.7],
     },
 ]
 
@@ -113,6 +120,7 @@ async def fetch_frames(request: FrameRetrievalRequest):
     logger.info(f"WMS Fetch request received for bbox: {request.bbox}")
     try:
         from app.services.wms_client import fetch_wms_frames
+        from app.services.geospatial import apply_transparency
         
         # Real fetch from NASA GIBS or specified WMS
         retrieved = fetch_wms_frames(request)
@@ -122,6 +130,9 @@ async def fetch_frames(request: FrameRetrievalRequest):
         global FRAME_CATALOG
         new_catalog = []
         for frame in retrieved:
+            # Apply transparency mask to remove black backgrounds
+            apply_transparency(frame['path'])
+            
             # Construct a catalog entry
             img_url = f"/data/frames/{os.path.basename(frame['path'])}"
             new_entry = {
