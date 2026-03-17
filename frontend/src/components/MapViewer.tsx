@@ -28,10 +28,10 @@ interface MapViewerProps {
   currentFrame?: SatelliteFrame;
 }
 
-// Bounding box for the satellite overlay (EPSG:3857)
-const OVERLAY_EXTENT = [8000000, 1800000, 9200000, 3000000];
-const DEFAULT_CENTER: [number, number] = [8600000, 2400000];
-const DEFAULT_ZOOM = 5;
+// Bounding box for the satellite overlay (EPSG:3857) - Covers the Indian subcontinent more accurately
+const OVERLAY_EXTENT = [7500000, 700000, 11000000, 4300000];
+const DEFAULT_CENTER: [number, number] = [9250000, 2500000];
+const DEFAULT_ZOOM = 4.5;
 
 // Define a style for the optical flow motion vectors
 const vectorStyle = new Style({
@@ -192,14 +192,21 @@ const MapViewer = ({
           Base Layer: OpenStreetMap
         </div>
         {currentFrame && showOverlay && (
-          <div
-            className={`border rounded px-3 py-1.5 text-xs font-mono transition-colors ${
-              currentFrame.isOriginal
-                ? "bg-green-500/20 border-green-500/40 text-green-300"
-                : "bg-blue-500/20 border-blue-500/40 text-blue-300"
-            }`}
-          >
-            Overlay: {currentFrame.timestamp} ({currentFrame.isOriginal ? "Original" : "Generated"})
+          <div className="flex flex-col gap-1">
+            <div
+              className={`border rounded px-3 py-1.5 text-xs font-mono transition-colors ${
+                currentFrame.isOriginal
+                  ? "bg-green-500/20 border-green-500/40 text-green-300"
+                  : "bg-blue-500/20 border-blue-500/40 text-blue-300"
+              }`}
+            >
+              Overlay: {currentFrame.timestamp} ({currentFrame.isOriginal ? "Original" : "Generated"})
+            </div>
+            {!currentFrame.isOriginal && showConfidence && (
+              <div className="bg-blue-500/20 border border-blue-500/40 rounded px-3 py-1.5 text-xs font-mono text-blue-300 animate-pulse">
+                Confidence: {Math.round(currentFrame.confidence * 100)}%
+              </div>
+            )}
           </div>
         )}
       </div>

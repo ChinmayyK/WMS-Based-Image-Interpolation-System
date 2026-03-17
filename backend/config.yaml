@@ -1,0 +1,7 @@
+bbox: [68.111378, 6.753515, 97.395561, 35.674545]
+frame_interval_minutes: 30
+generated_frames_per_interval: 3
+model: rife
+log_level: INFO
+host: 127.0.0.1
+port: 8000

@@ -14,8 +14,9 @@ def fetch_wms_frames(request: FrameRetrievalRequest) -> List[dict]:
     """
     # Use a default open WMS endpoint if not specified, e.g., NASA GIBS for test purposes (Blue Marble)
     wms_url = os.getenv("WMS_URL", "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi")
-    
-    data_dir = os.path.join(os.path.dirname(__file__), "../data/frames")
+    # Data directory relative to backend root
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    data_dir = os.path.join(base_dir, "data", "frames")
     os.makedirs(data_dir, exist_ok=True)
     
     # Example format: minx, miny, maxx, maxy

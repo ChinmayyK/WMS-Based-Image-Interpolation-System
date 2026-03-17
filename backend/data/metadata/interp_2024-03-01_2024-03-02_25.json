@@ -1,0 +1,11 @@
+{
+    "frame_id": "interp_2024-03-01_2024-03-02_25",
+    "time": "interp_2024-03-01_2024-03-02_1",
+    "generated": true,
+    "confidence": 0.94,
+    "source_frames": [
+        "frame_fcf3ac97_20240301.png",
+        "frame_b2c58943_20240302.png"
+    ],
+    "generated_at": 1773771199.6955452
+}

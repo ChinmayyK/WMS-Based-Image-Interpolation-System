@@ -6,6 +6,8 @@ so animation changes are clearly visible.
 import os
 import struct
 import zlib
+import math
+import numpy as np
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 RAW_DIR = os.path.join(DATA_DIR, "raw_frames")
@@ -31,15 +33,27 @@ def create_png(width: int, height: int, top_color: tuple, bottom_color: tuple) -
         return struct.pack('>I', len(data)) + chunk + struct.pack('>I', zlib.crc32(chunk) & 0xffffffff)
 
     raw_data = b''
+    # Simple deterministic noise based on coordinates to represent "features"
+    seed = (top_color[0] + bottom_color[1]) % 100
     for y in range(height):
         raw_data += b'\x00'  # filter byte
         t = float(y) / float(max(height - 1, 1))
         for x in range(width):
             tx = float(x) / float(max(width - 1, 1))
-            r = int(float(top_color[0]) * (1.0 - t) + float(bottom_color[0]) * t + 30.0 * tx)
-            g = int(float(top_color[1]) * (1.0 - t) + float(bottom_color[1]) * t + 20.0 * (1.0 - tx))
-            b = int(float(top_color[2]) * (1.0 - t) + float(bottom_color[2]) * t)
-            r, g, b = min(r, 255), min(g, 255), min(b, 255)
+            
+            # Base gradient
+            r_base = float(top_color[0]) * (1.0 - t) + float(bottom_color[0]) * t
+            g_base = float(top_color[1]) * (1.0 - t) + float(bottom_color[1]) * t
+            b_base = float(top_color[2]) * (1.0 - t) + float(bottom_color[2]) * t
+            
+            # Add some "cloud" noise
+            noise = (np.sin(x * 0.1 + seed) * np.cos(y * 0.1 - seed) * 30) + (np.sin((x+y) * 0.05) * 20)
+            
+            r = int(r_base + noise + 30.0 * tx)
+            g = int(g_base + noise + 20.0 * (1.0 - tx))
+            b = int(b_base + noise)
+            
+            r, g, b = max(0, min(r, 255)), max(0, min(g, 255)), max(0, min(b, 255))
             raw_data += struct.pack('BBB', r, g, b)
 
     compressed = zlib.compress(raw_data)

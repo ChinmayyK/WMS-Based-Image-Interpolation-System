@@ -1,0 +1,11 @@
+{
+    "frame_id": "interp_10:00_10:30_75",
+    "time": "interp_10:00_10:30_3",
+    "generated": true,
+    "confidence": 0.91,
+    "source_frames": [
+        "frame_10_00.png",
+        "frame_10_30.png"
+    ],
+    "generated_at": 1773769079.0337129
+}

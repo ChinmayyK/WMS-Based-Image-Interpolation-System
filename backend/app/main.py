@@ -1,10 +1,28 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.api.routes import router as api_router
 import os
+import yaml
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(levelname)s] %(asctime)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="WMS-Based Image Interpolation System API")
+
+# Load config
+config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.yaml")
+try:
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+        logger.info(f"Loaded configuration from {config_path}")
+except Exception as e:
+    logger.warning(f"Could not load config.yaml: {e}")
 
 # Configure CORS
 app.add_middleware(
