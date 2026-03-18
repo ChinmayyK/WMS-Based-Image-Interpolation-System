@@ -181,18 +181,22 @@ async def interpolate_frames(request: InterpolationRequest):
         
         out_dir = os.path.join(DATA_DIR, "interpolated_frames")
         
+        # Use Windows-safe identifiers for filenames
+        safe_f1 = request.frame1_id.replace(":", "-")
+        safe_f2 = request.frame2_id.replace(":", "-")
+        
         # Real interpolation logic
         logger.info(f"Running RIFE interpolation between {f1_path} and {f2_path}")
         generated_paths = generate_intermediate_frames(
-            f1_path, f2_path, out_dir, request.steps, file_prefix=f"interp_{request.frame1_id}_{request.frame2_id}"
+            f1_path, f2_path, out_dir, request.steps, file_prefix=f"interp_{safe_f1}_{safe_f2}"
         )
         logger.info(f"Generated {len(generated_paths)} frames successfully.")
         
         new_frames = []
         for i, path in enumerate(generated_paths):
             ratio = (i + 1) / (request.steps + 1)
-            # Use a synthetic intermediate timestamp identifier
-            new_ts = f"interp_{request.frame1_id}_{request.frame2_id}_{i+1}"
+            # Use a synthetic intermediate timestamp identifier (Windows safe)
+            new_ts = f"interp_{safe_f1}_{safe_f2}_{i+1}"
             confidence = round(0.95 - (0.05 * ratio), 2)
             
             # Generate metadata JSON
