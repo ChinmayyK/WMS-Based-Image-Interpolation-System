@@ -16,3 +16,5 @@ opencv-python
 numpy
 torch
 torchvision
+gdown
+scikit-image

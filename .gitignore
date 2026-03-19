@@ -16,9 +16,15 @@ venv/
 *.DS_Store
 
 # Data
-backend/app/data/*
-!backend/app/data/.keep
+backend/data/*
+!backend/data/.keep
+backend/results/*
+
+# RIFE Weights
+backend/app/rife_model/weights/*.pkl
+backend/app/rife_model/weights/*.pth
 
 # Hrishikesh's personal files
 hrishikesh_tasks.md
 hrishikesh_modifications_log.md
+
