@@ -92,17 +92,6 @@ const FrameInfoPanel = ({
 
         <div className="px-6 py-6 space-y-8">
           <div className="grid grid-cols-1 gap-6">
-            <AnalyticsRow label="Frame Type" value={frameType} />
-            <AnalyticsRow label="Acquisition Time" value={frame.timestamp} />
-            <AnalyticsRow
-              label="Confidence / State"
-              value={
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-mono font-bold text-foreground">{formatConfidenceValue(frame)}</span>
-                  <ConfidenceIndicator category={confidenceCategory} />
-                </div>
-              }
-            />
             {confidenceBreakdown && <AnalyticsRow label="Adaptive Metrics" value={confidenceBreakdown} />}
             {pairGapLabel && <AnalyticsRow label="Pair Gap" value={pairGapLabel} />}
             {frame.metrics?.normalizedSSIM !== undefined && (
@@ -307,13 +296,7 @@ const FrameInfoPanel = ({
             )}
           </div>
 
-          {isAIFrame && (
-            <div className="pt-6 border-t border-white/5">
-              <div className="rounded-md border border-confidence-low/35 bg-confidence-low/18 px-3 py-2 text-[10px] font-mono text-white">
-                AI-GENERATED — NOT OBSERVED DATA
-              </div>
-            </div>
-          )}
+
 
           <div className="pt-6 border-t border-white/5 flex items-center justify-between">
             <label className="text-[9px] uppercase tracking-widest text-muted-foreground/60 font-bold">

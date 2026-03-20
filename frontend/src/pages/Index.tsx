@@ -42,12 +42,10 @@ const Index = () => {
   const [exportInProgress, setExportInProgress] = useState(false);
   const [evaluationInProgress, setEvaluationInProgress] = useState(false);
   const [exportData, setExportData] = useState<any>(null);
+  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
   const currentFrame = frames[currentIndex];
-  const selectedPair = resolveInterpolationPair(frames, currentIndex);
-  const nearestObservedFrame = resolveNearestObservedFrame(frames, currentIndex);
-
   // Initial Demo loading simulation
   useEffect(() => {
     if (dataSource !== "demo") return;
@@ -156,8 +154,9 @@ const Index = () => {
   }, [currentJobId]);
 
   useEffect(() => {
-    setInterpolationNotice(buildInterpolationNotice(dataSource, currentFrame, selectedPair));
-  }, [dataSource, currentFrame, selectedPair]);
+    const pair = resolveInterpolationPair(frames, currentIndex);
+    setInterpolationNotice(buildInterpolationNotice(dataSource, currentFrame, pair));
+  }, [dataSource, currentFrame, frames, currentIndex]);
 
   const goNext = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % frames.length);
@@ -311,23 +310,24 @@ const Index = () => {
   };
 
   const handleGenerateInterpolation = useCallback(async () => {
-    if (dataSource !== "api" || !selectedPair) {
+    const pair = resolveInterpolationPair(frames, currentIndex);
+    if (dataSource !== "api" || !pair) {
       return;
     }
 
-    if (selectedPair.gapMinutes > 30) {
+    if (pair.gapMinutes > 30) {
       setInterpolationNotice("Interpolation disabled: gap exceeds 30 minutes");
       return;
     }
 
     try {
-      setInterpolationNotice(`Generating recursive midpoint frames for ${selectedPair.gapMinutes.toFixed(1)} minute gap…`);
+      setInterpolationNotice(`Generating recursive midpoint frames for ${pair.gapMinutes.toFixed(1)} minute gap…`);
       const response = await fetch("/api/frames/interpolate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          frame1_id: selectedPair.frame1.timestamp,
-          frame2_id: selectedPair.frame2.timestamp,
+          frame1_id: pair.frame1.timestamp,
+          frame2_id: pair.frame2.timestamp,
           steps: 3,
         }),
       });
@@ -337,14 +337,14 @@ const Index = () => {
       }
       await fetchFromApi(false);
       setInterpolationNotice(
-        `Interpolation completed using recursive bisection between ${selectedPair.frame1.timestamp} and ${selectedPair.frame2.timestamp}.`
+        `Interpolation completed using recursive bisection between ${pair.frame1.timestamp} and ${pair.frame2.timestamp}.`
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "Interpolation failed";
       setInterpolationNotice(message);
       setError(message);
     }
-  }, [dataSource, selectedPair, fetchFromApi]);
+  }, [dataSource, currentIndex, frames, fetchFromApi]);
 
   const handleExportVideo = useCallback(async () => {
     try {
@@ -399,7 +399,9 @@ const Index = () => {
     }
   }, []);
 
-  const interpolationDisabled = dataSource !== "api" || !selectedPair || selectedPair.gapMinutes > 30;
+  const pair = resolveInterpolationPair(frames, currentIndex);
+  const nearestObserved = resolveNearestObservedFrame(frames, currentIndex);
+  const interpolationDisabled = dataSource !== "api" || !pair || pair.gapMinutes > 30;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground selection:bg-primary/30">
@@ -410,156 +412,186 @@ const Index = () => {
         runtimeSummary={getRuntimeSummary(runtimeDiagnostics)}
       />
 
-      <main className="flex flex-1 min-h-0 relative px-4 pb-4 gap-4">
-        <div className="flex-[4] flex flex-col min-w-0 gap-4">
-          <div className="flex-1 min-h-0 relative glass rounded-xl overflow-hidden border-white/10 flex flex-col justify-center">
-            {dataSource === "api" && frames.length === 0 && !currentJobId && !isLoading && !error && (
-              <div className="p-4 overflow-y-auto">
-                <JobSubmissionPanel onSubmit={handleJobSubmit} isSubmitting={isLoading} />
+      <main className="flex-1 relative w-full h-full min-h-0 bg-map-bg">
+        <div className="absolute inset-0 z-0">
+          {comparisonMode === "split" && frames.length > 0 ? (
+            <div className="flex w-full h-full gap-2 p-2 pt-4">
+              <div className="flex-1 relative rounded-lg overflow-hidden border border-white/5">
+                <div className="absolute top-3 left-3 z-20 glass px-2 py-1 rounded text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+                  Original
+                </div>
+                <MapViewer
+                  opacity={opacity}
+                  showOverlay={showOverlay}
+                  onToggleOverlay={() => setShowOverlay(!showOverlay)}
+                  showRawSensorGaps={showRawSensorGaps}
+                  onToggleRawSensorGaps={() => setShowRawSensorGaps(!showRawSensorGaps)}
+                  showConfidence={showConfidence}
+                  onToggleConfidence={() => setShowConfidence(!showConfidence)}
+                  showClouds={showClouds}
+                  onToggleClouds={() => setShowClouds(!showClouds)}
+                  showVectors={showVectors}
+                  onToggleVectors={() => setShowVectors(!showVectors)}
+                  currentFrame={nearestObserved || currentFrame}
+                  comparisonMode="split"
+                  runtimeDiagnostics={runtimeDiagnostics}
+                />
               </div>
-            )}
-            
-            {isLoading && (
-              <LoadingOverlay
-                message={jobPhase || (loadProgress < 100 ? "INITIALIZING DATA STREAM…" : "SYNCHRONIZING SENSORS…")}
-                progress={loadProgress}
-              />
-            )}
-            {error && <ErrorPanel message={error} onRetry={handleRetry} />}
-
-            {!error && !isLoading && frames.length > 0 && (
-              <div className="w-full h-full relative">
-                {comparisonMode === "split" ? (
-                  <div className="flex w-full h-full gap-2 p-2">
-                    <div className="flex-1 relative rounded-lg overflow-hidden border border-white/5">
-                      <div className="absolute top-3 left-3 z-10 glass px-2 py-1 rounded text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-                        Original
-                      </div>
-                      <MapViewer
-                        opacity={opacity}
-                        showOverlay={showOverlay}
-                        onToggleOverlay={() => setShowOverlay(!showOverlay)}
-                        showRawSensorGaps={showRawSensorGaps}
-                        onToggleRawSensorGaps={() => setShowRawSensorGaps(!showRawSensorGaps)}
-                        showConfidence={showConfidence}
-                        onToggleConfidence={() => setShowConfidence(!showConfidence)}
-                        showClouds={showClouds}
-                        onToggleClouds={() => setShowClouds(!showClouds)}
-                        showVectors={showVectors}
-                        onToggleVectors={() => setShowVectors(!showVectors)}
-                        currentFrame={nearestObservedFrame || currentFrame}
-                        comparisonMode="split"
-                        runtimeDiagnostics={runtimeDiagnostics}
-                      />
-                    </div>
-                    <div className="flex-1 relative rounded-lg overflow-hidden border border-primary/20">
-                      <div className="absolute top-3 left-3 z-10 glass px-2 py-1 rounded text-[10px] font-mono text-primary uppercase tracking-widest">
-                        AI Processed
-                      </div>
-                      <MapViewer
-                        opacity={opacity}
-                        showOverlay={showOverlay}
-                        onToggleOverlay={() => setShowOverlay(!showOverlay)}
-                        showRawSensorGaps={showRawSensorGaps}
-                        onToggleRawSensorGaps={() => setShowRawSensorGaps(!showRawSensorGaps)}
-                        showConfidence={showConfidence}
-                        onToggleConfidence={() => setShowConfidence(!showConfidence)}
-                        showClouds={showClouds}
-                        onToggleClouds={() => setShowClouds(!showClouds)}
-                        showVectors={showVectors}
-                        onToggleVectors={() => setShowVectors(!showVectors)}
-                        currentFrame={currentFrame}
-                        comparisonMode="split"
-                        runtimeDiagnostics={runtimeDiagnostics}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <MapViewer
-                    opacity={opacity}
-                    showOverlay={showOverlay}
-                    onToggleOverlay={() => setShowOverlay(!showOverlay)}
-                    showRawSensorGaps={showRawSensorGaps}
-                    onToggleRawSensorGaps={() => setShowRawSensorGaps(!showRawSensorGaps)}
-                    showConfidence={showConfidence}
-                    onToggleConfidence={() => setShowConfidence(!showConfidence)}
-                    showClouds={showClouds}
-                    onToggleClouds={() => setShowClouds(!showClouds)}
-                    showVectors={showVectors}
-                    onToggleVectors={() => setShowVectors(!showVectors)}
-                    currentFrame={comparisonMode === "toggle" && toggleView === "original" ? (nearestObservedFrame || currentFrame) : currentFrame}
-                    comparisonMode={comparisonMode}
-                    runtimeDiagnostics={runtimeDiagnostics}
-                  />
-                )}
-
-                {!currentFrame && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-md z-50">
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-                      <p className="text-xs tracking-[0.2em] uppercase font-mono text-primary animate-pulse">Establishing Satellite Link...</p>
-                    </div>
-                  </div>
-                )}
+              <div className="flex-1 relative rounded-lg overflow-hidden border border-primary/20">
+                <div className="absolute top-3 left-3 z-20 glass px-2 py-1 rounded text-[10px] font-mono text-primary uppercase tracking-widest">
+                  AI Processed
+                </div>
+                <MapViewer
+                  opacity={opacity}
+                  showOverlay={showOverlay}
+                  onToggleOverlay={() => setShowOverlay(!showOverlay)}
+                  showRawSensorGaps={showRawSensorGaps}
+                  onToggleRawSensorGaps={() => setShowRawSensorGaps(!showRawSensorGaps)}
+                  showConfidence={showConfidence}
+                  onToggleConfidence={() => setShowConfidence(!showConfidence)}
+                  showClouds={showClouds}
+                  onToggleClouds={() => setShowClouds(!showClouds)}
+                  showVectors={showVectors}
+                  onToggleVectors={() => setShowVectors(!showVectors)}
+                  currentFrame={currentFrame}
+                  comparisonMode="split"
+                  runtimeDiagnostics={runtimeDiagnostics}
+                />
               </div>
-            )}
-          </div>
-
-          <div className="glass rounded-xl p-6 shadow-2xl">
-            <TimelineSlider
-              frames={frames}
-              currentIndex={currentIndex}
-              onIndexChange={setCurrentIndex}
-            />
-            <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
-              <AnimationControls
-                isPlaying={isPlaying}
-                onPlayPause={() => setIsPlaying(!isPlaying)}
-                onNext={goNext}
-                onPrev={goPrev}
-                speed={speed}
-                onSpeedChange={setSpeed}
-                opacity={opacity}
-                onOpacityChange={setOpacity}
-                onInterpolate={handleGenerateInterpolation}
-                interpolationDisabled={interpolationDisabled}
-                interpolationNotice={interpolationNotice}
-                onExportVideo={handleExportVideo}
-                exportDisabled={frames.length === 0}
-                exportInProgress={exportInProgress}
-                onRunEvaluation={handleRunEvaluation}
-                evaluationInProgress={evaluationInProgress}
-              />
             </div>
-          </div>
-        </div>
-
-        <aside className="flex-1 min-w-[320px] flex flex-col gap-4">
-          {currentFrame && (
-            <FrameInfoPanel
-              frame={currentFrame}
-              frameIndex={currentIndex}
-              totalFrames={frames.length}
-              comparisonMode={comparisonMode}
-              onComparisonModeChange={setComparisonMode}
-              toggleView={toggleView}
-              onToggleViewChange={setToggleView}
-              isDemoMode={dataSource === "demo"}
+          ) : (
+            <MapViewer
+              opacity={opacity}
+              showOverlay={showOverlay}
+              onToggleOverlay={() => setShowOverlay(!showOverlay)}
               showRawSensorGaps={showRawSensorGaps}
+              onToggleRawSensorGaps={() => setShowRawSensorGaps(!showRawSensorGaps)}
+              showConfidence={showConfidence}
+              onToggleConfidence={() => setShowConfidence(!showConfidence)}
+              showClouds={showClouds}
+              onToggleClouds={() => setShowClouds(!showClouds)}
+              showVectors={showVectors}
+              onToggleVectors={() => setShowVectors(!showVectors)}
+              currentFrame={comparisonMode === "toggle" && toggleView === "original" ? (nearestObserved || currentFrame) : currentFrame}
+              comparisonMode={comparisonMode}
               runtimeDiagnostics={runtimeDiagnostics}
-              interpolationNotice={interpolationNotice}
             />
           )}
 
-          {dataSource === "api" && currentJobId && (
+          {!currentFrame && !error && !isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-md z-50">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+                <p className="text-xs tracking-[0.2em] uppercase font-mono text-primary animate-pulse">Establishing Satellite Link...</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Floating Modals / Overlays */}
+        {dataSource === "api" && frames.length === 0 && !currentJobId && !isLoading && !error && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 overflow-y-auto">
+            <JobSubmissionPanel onSubmit={handleJobSubmit} isSubmitting={isLoading} />
+          </div>
+        )}
+        
+        {isLoading && (
+          <div className="absolute inset-0 z-50">
+            <LoadingOverlay
+              message={jobPhase || (loadProgress < 100 ? "INITIALIZING DATA STREAM…" : "SYNCHRONIZING SENSORS…")}
+              progress={loadProgress}
+            />
+          </div>
+        )}
+        {error && (
+          <div className="absolute inset-0 z-50 p-4 pointer-events-none flex items-start justify-center pt-20">
+            <div className="pointer-events-auto">
+              <ErrorPanel message={error} onRetry={handleRetry} />
+            </div>
+          </div>
+        )}
+
+        {/* Timeline Bottom Bar */}
+        {!error && !isLoading && frames.length > 0 && (
+          <div className="absolute bottom-0 left-0 right-0 z-40 p-4">
+            <div className="glass rounded-xl p-4 shadow-2xl border border-white/10 md:px-6">
+              <TimelineSlider
+                frames={frames}
+                currentIndex={currentIndex}
+                onIndexChange={setCurrentIndex}
+              />
+              <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-3">
+                <AnimationControls
+                  isPlaying={isPlaying}
+                  onPlayPause={() => setIsPlaying(!isPlaying)}
+                  onNext={goNext}
+                  onPrev={goPrev}
+                  speed={speed}
+                  onSpeedChange={setSpeed}
+                  opacity={opacity}
+                  onOpacityChange={setOpacity}
+                  onInterpolate={handleGenerateInterpolation}
+                  interpolationDisabled={interpolationDisabled}
+                  interpolationNotice={interpolationNotice}
+                  onExportVideo={handleExportVideo}
+                  exportDisabled={frames.length === 0}
+                  exportInProgress={exportInProgress}
+                  onRunEvaluation={handleRunEvaluation}
+                  evaluationInProgress={evaluationInProgress}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Top Right Floating Export Panel (if any) */}
+        {dataSource === "api" && currentJobId && exportData && (
+          <div className="absolute top-24 right-4 z-40 w-80">
             <ExportResultsPanel
               exportData={exportData}
               isExporting={exportInProgress}
               onExport={handleJobExport}
               jobCompleted={!isLoading && frames.length > 0}
             />
+          </div>
+        )}
+
+        {/* Top Right Toggle button for Diagnostics */}
+        {frames.length > 0 && (
+          <button
+            onClick={() => setIsDiagnosticsOpen(!isDiagnosticsOpen)}
+            className="absolute top-4 right-4 z-50 glass h-10 px-4 rounded-lg border border-white/10 flex items-center gap-2 hover:bg-white/10 text-[10px] font-mono font-bold tracking-widest text-primary transition-all shadow-xl"
+          >
+            {isDiagnosticsOpen ? "CLOSE PANEL" : "ADVANCED "}
+            <div className={`w-2 h-2 rounded-full ${isDiagnosticsOpen ? 'bg-confidence-low' : 'bg-primary animate-pulse'}`} />
+          </button>
+        )}
+
+        {/* Slide-in Diagnostics Panel */}
+        <div 
+          className={`absolute top-0 right-0 h-full w-[380px] z-40 transition-transform duration-500 ease-in-out p-4 pb-44 ${
+            isDiagnosticsOpen && frames.length > 0 ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          {currentFrame && (
+            <div className="h-full mt-14 shadow-2xl rounded-xl overflow-hidden glass border border-white/10">
+              <FrameInfoPanel
+                frame={currentFrame}
+                frameIndex={currentIndex}
+                totalFrames={frames.length}
+                comparisonMode={comparisonMode}
+                onComparisonModeChange={setComparisonMode}
+                toggleView={toggleView}
+                onToggleViewChange={setToggleView}
+                isDemoMode={dataSource === "demo"}
+                showRawSensorGaps={showRawSensorGaps}
+                runtimeDiagnostics={runtimeDiagnostics}
+                interpolationNotice={interpolationNotice}
+              />
+            </div>
           )}
-        </aside>
+        </div>
+
       </main>
     </div>
   );

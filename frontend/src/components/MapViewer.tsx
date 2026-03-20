@@ -13,7 +13,6 @@ import { get as getProjection } from "ol/proj";
 import { Layer } from "ol/layer";
 import "ol/ol.css";
 import MapControlsPanel from "./MapControlsPanel";
-import LegendPanel from "./LegendPanel";
 import {
   CATEGORY_STYLES,
   formatConfidenceValue,
@@ -268,63 +267,33 @@ const MapViewer = ({
   }, [currentFrame]);
 
   return (
-    <div className="relative w-full h-full bg-map-bg rounded overflow-hidden border">
+    <div className="relative w-full h-full bg-map-bg rounded overflow-hidden shadow-inner">
       <div ref={mapRef} className="w-full h-full" />
 
-      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none">
-        <div className="bg-background/90 backdrop-blur-md border border-primary/20 rounded-lg p-4 shadow-xl min-w-[200px]">
-          <div className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-1">
+      {/* AI DISCLOSURE BANNER */}
+      {isInterpolatedFrame && (
+        <div className="absolute top-0 left-0 right-0 z-50 flex justify-center pointer-events-none fade-in">
+          <div className="bg-confidence-low/90 backdrop-blur-md text-white/90 text-[10px] font-mono font-bold tracking-[0.2em] px-8 py-1.5 rounded-b-lg border-x border-b border-confidence-low/50 shadow-[0_4px_20px_rgba(239,68,68,0.3)]">
+            AI-GENERATED — NOT OBSERVED DATA
+          </div>
+        </div>
+      )}
+
+      {/* COMPACT TOP-LEFT INFO CARD */}
+      <div className="absolute top-4 left-4 z-40 flex flex-col gap-2 pointer-events-none">
+        <div className="glass backdrop-blur-md border border-white/10 rounded-lg p-3 shadow-xl min-w-[160px] flex flex-col gap-1.5 transition-all">
+          <div className="text-[9px] uppercase font-bold tracking-widest text-muted-foreground/80">
             {frameType}
           </div>
-          <div className="text-base font-mono font-bold text-primary flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
+          <div className="text-sm font-mono font-bold text-foreground flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full animate-pulse flex-shrink-0 ${isInterpolatedFrame ? 'bg-amber-500' : 'bg-green-500'}`} />
             {currentFrame?.timestamp}
           </div>
-          <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${confidenceStyle.bg} ${confidenceStyle.text} ${confidenceStyle.border}`}>
-              {confidenceCategory}
+          <div className="flex items-center gap-2 mt-1">
+            <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold tracking-wider ${confidenceStyle.bg} ${confidenceStyle.text} ${confidenceStyle.border}`}>
+              CONFIDENCE: {confidenceCategory}
             </span>
-            {gapStyle && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${gapStyle.bg} ${gapStyle.text} ${gapStyle.border}`}>
-                GAP — NO DATA
-              </span>
-            )}
-            {isInterpolatedFrame && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded border font-bold bg-primary/15 text-primary border-primary/20">
-                AI-GENERATED
-              </span>
-            )}
-            {showConfidence && (
-              <span className="text-[10px] bg-primary/20 text-primary-foreground px-1.5 py-0.5 rounded font-bold">
-                {confidenceCategory}: {confidenceValue}
-              </span>
-            )}
           </div>
-          {gapFillDescription && (
-            <div className="mt-2 text-[10px] font-mono text-muted-foreground">
-              {gapFillDescription}
-            </div>
-          )}
-          {confidenceBreakdown && (
-            <div className="mt-2 text-[10px] font-mono text-muted-foreground">
-              {confidenceBreakdown}
-            </div>
-          )}
-          {currentFrame?.isGapPlaceholder && currentFrame?.placeholderReason && (
-            <div className="mt-2 rounded-md border border-gap/25 bg-gap/12 px-2 py-1 text-[10px] font-mono text-gap">
-              {currentFrame.placeholderReason}
-            </div>
-          )}
-          {isInterpolatedFrame && (
-            <div className="mt-2 rounded-md border border-confidence-low/35 bg-confidence-low/18 px-2 py-1 text-[10px] font-mono text-white">
-              AI-GENERATED — NOT OBSERVED DATA
-            </div>
-          )}
-          {performanceExplanation && (
-            <div className="mt-2 text-[10px] font-mono text-muted-foreground">
-              {performanceExplanation}
-            </div>
-          )}
         </div>
       </div>
 
@@ -341,7 +310,6 @@ const MapViewer = ({
         showVectors={showVectors}
         onToggleVectors={onToggleVectors}
       />
-      <LegendPanel />
     </div>
   );
 };
