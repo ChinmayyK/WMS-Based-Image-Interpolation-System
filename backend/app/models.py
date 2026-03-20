@@ -15,6 +15,29 @@ class InterpolationRequest(BaseModel):
     frame2_id: str
     steps: int = 1
 
+
+class ExportFrameRequest(BaseModel):
+    timestamp: str
+    imageUrl: str
+    rawImageUrl: Optional[str] = None
+    cleanImageUrl: Optional[str] = None
+    isOriginal: bool
+    confidence: float
+    confidenceLabel: Optional[str] = None
+    sourceFrames: Optional[List[str]] = None
+    isGapPlaceholder: Optional[bool] = False
+
+
+class VideoExportRequest(BaseModel):
+    frames: List[ExportFrameRequest]
+    fps: int = 15
+    raw_mode: bool = False
+    job_name: str = "sequence_export"
+
+
+class EvaluationRequest(BaseModel):
+    rerun: bool = True
+
 class MetadataResponse(BaseModel):
     frame_id: str
     timestamp: str

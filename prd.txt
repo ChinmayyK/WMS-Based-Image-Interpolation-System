@@ -1,0 +1,2580 @@
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+PRODUCT REQUIREMENTS
+DOCUMENT
+AI-Based Temporal Enhancement & Accuracy-Aware WebGIS Visualization
+System
+for Satellite Imagery
+Version 2.0 | Status: REVISED — Production-Ready Specification
+Supersedes: PRD v1.0 (Pre-Development Review)
+Classification: Internal — College Major Project
+Attribute Value
+Document Version 2.0
+Replaces PRD v1.0 — all warnings and caveats from v1.0 are now resolved
+with concrete engineering decisions
+Project Classification Major Project — Production-Grade Architecture (not a prototype or
+demo)
+Domain Geospatial AI · Remote Sensing · Computer Vision · WebGIS
+Status Approved for Development — all open questions resolved
+Target Duration 4–5 months
+Page 1 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Table of Contents
+0. Design Philosophy & How v2.0 Differs from v1.0
+1. Executive Summary
+2. Problem Statement
+3. System Scope
+4. Guardrails, Policies & Non-Negotiable Rules
+5. Technical Architecture — Production Design
+6. Module 1: Data Ingestion
+7. Module 2: Preprocessing Pipeline
+8. Module 3: Interpolation Engine
+9. Module 4: Validation & Confidence System
+10. Module 5: Video Generation
+11. Module 6: WebGIS Frontend
+12. Module 7: Evaluation Engine
+13. Edge Case Registry — Complete & Resolved
+14. Non-Functional Requirements
+15. Testing Strategy
+16. Implementation Roadmap
+17. Risk Register — Mitigated
+18. Operational Policies & Governance
+19. Glossary
+Appendices
+Page 2 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+0. Design Philosophy — How PRD v2.0 Differs from
+v1.0
+PRD v1.0 identified problems, wrong assumptions, and technical risks. PRD v2.0 resolves every one of
+them with concrete engineering decisions. This is not an incremental update — it is a complete
+production specification.
+0.1 The Three Core Principles of This System
+Principle 1 — Honesty Over Impressiveness
+Every output the system produces must clearly communicate what it is: observed, interpolated-high-
+confidence, interpolated-low-confidence, or rejected. A system that is honest about uncertainty is more
+valuable than one that always generates an output. This principle is enforced at the architecture level,
+not as a UI afterthought.
+Principle 2 — Fail Loudly, Never Silently
+Every failure mode — from a network timeout to a rejected interpolation frame — must produce a
+logged, classified, user-visible signal. Silent failures are prohibited. The system must always know its
+own state.
+Principle 3 — Domain-First Engineering
+Satellite imagery is not natural video. Every architectural decision — model selection, preprocessing
+steps, validation thresholds, confidence scoring — must be derived from satellite imagery
+characteristics, not from assumptions inherited from natural video pipelines.
+0.2 Resolution Summary — v1.0 Warnings → v2.0 Solutions
+v1.0 Warning / Problem v2.0 Resolution Section
+RIFE domain gap — model
+Mandatory Phase 0 benchmark. RIFE fine-tuned
+Sec 8
+trained on natural video
+on GOES archive OR replaced by satellite-
+optimised optical flow warping. Decision gated by
+PSNR ≥ 28 dB test.
+DAIN listed as optional model
+DAIN permanently removed from architecture.
+Sec 8
+despite requiring depth maps
+Model candidates are RIFE 4.6, FILM, and Lucas-
+Kanade optical flow warping baseline only.
+Optical flow check
+Validation layer renamed "Statistical Plausibility
+Sec 9
+misrepresented as physics
+Module." Documentation explicitly states it tests
+validation
+visual consistency, not physical correctness. NWP
+disclaimer added to all outputs.
+Page 3 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+v1.0 Warning / Problem v2.0 Resolution Section
+"10x–30x temporal resolution
+Metric removed entirely. Replaced by: PSNR,
+Sec 7, 12
+improvement" — misleading
+SSIM, LPIPS, and tOF against held-out ground
+metric
+truth. No claims of resolution improvement.
+NASA GIBS and Bhuvan
+Separate integration modules with different auth,
+Sec 6
+treated as interchangeable
+rate-limit, and schema handlers. GIBS is primary;
+MOSDAC is independent secondary module with
+explicit fallback.
+Static confidence thresholds
+Adaptive per-session threshold calibration using
+Sec 9
+may be wrong for different
+first N original frames as baseline. Static
+regions/seasons
+thresholds are fallback only.
+No handling for WMS rate
+Full request queue with exponential backoff, local
+Sec 6
+limits at scale
+disk cache with TTL, NASA Earthdata token
+integration.
+Pipeline latency precludes
+Acknowledged as architectural constraint. System
+Sec 14
+real-time use
+operates in near-real-time mode (15–45 min
+latency). True real-time deferred to future GPU-
+optimised version.
+No training data strategy for
+Full fine-tuning pipeline documented using noaa-
+Sec 8
+fine-tuning
+goes16 AWS S3 archive. Training, validation, and
+test split defined.
+No system-level testing or
+Full 4-tier testing strategy: unit → integration →
+Sec 15
+verification plan
+end-to-end → performance. 100% coverage
+requirement on pipeline modules.
+Page 4 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+1. Executive Summary
+This document specifies a production-grade, accuracy-aware AI system that enhances the temporal
+continuity of geostationary satellite imagery for WebGIS visualization. The system is designed to be
+deployable, testable, and academically defensible — not a prototype or proof-of-concept.
+Geostationary satellites (GOES-16/18, Himawari-8/9, INSAT-3D/3DR/3DS) observe the Earth at
+intervals of 5–30 minutes, producing temporally sparse animation when visualised dynamically. The
+system bridges this gap by generating statistically plausible intermediate frames using AI-based
+interpolation, then classifying each generated frame by its reliability before delivering it to users.
+ℹ NOTE: What This System Is and Is Not
+IS: A visualization enhancement layer that makes satellite animation smoother and easier to
+interpret.
+IS: An accuracy-aware system that discloses the reliability of every frame it generates.
+IS: A production-grade pipeline that fails safely, caches intelligently, and validates rigorously.
+IS NOT: A scientific data product. Interpolated frames cannot replace real observations.
+IS NOT: A weather forecasting system. No predictions of future atmospheric state are made.
+IS NOT: A real-time system. Pipeline latency is 15–45 minutes for current architecture.
+Page 5 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+2. Problem Statement
+2.1 Observed Data Temporal Gaps
+Satellite Platform Full-Disk
+Fastest Mode Primary Use Case
+Interval
+for This System
+GOES-16 /
+NOAA (Americas) 10 min 60 sec
+Primary — best
+GOES-18
+(Mesoscale)
+archive access via
+AWS S3
+Himawari-8 /
+JMA (Asia-Pacific) 10 min 30 sec (Target) Secondary — AWS
+Himawari-9
+S3 available
+INSAT-3D /
+ISRO (Indian
+30 min ~15 min (Sector) Tertiary — MOSDAC
+INSAT-3DR
+Ocean)
+API required
+INSAT-3DS
+ISRO (Indian
+26 min TBD Future — verify
+(2024)
+Ocean)
+MOSDAC availability
+first
+2.2 Stakeholder Problem Map
+Stakeholder Specific Pain Point Measurable Success Criterion
+GIS Analyst 10-min frame jumps break motion
+Smooth loop ≥ 15 fps with no perceptible
+trajectory tracking in cloud
+jump; SSIM ≥ 0.80
+systems
+Meteorology Student 30-min INSAT loops appear as
+Animation rated ≥ 4/5 for motion clarity
+slideshows; cyclone motion is
+in user study
+uninterpretable
+Disaster Response
+Choppy loops undermine briefing
+A/B test: ≥ 70% prefer interpolated
+Briefer
+effectiveness for decision-makers
+animation for briefing use
+Remote Sensing
+Sub-interval phenomena invisible;
+Held-out frame PSNR ≥ 28 dB; valid
+Researcher
+gaps force manual inference
+confidence labels on all frames
+Media / Visualisation Satellite loops too jerky for
+MP4 output plays at 24 fps with no
+broadcast or public dashboards
+dropped frames
+2.3 Why Existing Approaches Do Not Solve This
+• NASA Worldview / GIBS: Provides imagery at native resolution only. No interpolation. Animation
+is frame-by-frame at native cadence.
+• Windy / Ventusky: Uses NWP model output (ECMWF/GFS), not actual satellite imagery.
+Smooth, but not derived from real observations.
+Page 6 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+• FFmpeg speed manipulation: Changes playback speed, does not generate intermediate frames.
+Produces the same choppy content at different rates.
+• Academic optical flow tools (e.g., GOES-R specific studies): Exist in research papers but no
+open, integrated, end-to-end WebGIS pipeline is publicly available.
+• This system: Fills the gap by combining real WMS-fetched satellite data, AI interpolation,
+statistical validation, and a production WebGIS frontend in one integrated pipeline.
+Page 7 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+3. System Scope
+3.1 In-Scope Features
+Feature Description Priority Acceptance Gate
+WMS Data
+OGC WMS client for NASA
+P0 Pipeline fetches 6-hr GOES
+Ingestion
+GIBS and MOSDAC with
+sequence without crash or silent
+caching, auth, and rate-limit
+failure
+handling
+Preprocessing
+Spatial alignment, radiometric
+P0 All frames pass spatial consistency
+Pipeline
+normalisation, gap detection,
+check; no NaN values in output
+masking
+tensors
+Interpolation
+RIFE 4.6 (fine-tuned) or
+P0 PSNR ≥ 28 dB on held-out test set
+Engine
+optical flow warping;
+configurable depth; recursive
+bisection
+Statistical
+Flow consistency, SSIM
+P0 Classifier precision ≥ 80% on
+Plausibility Module
+check, MAD check; adaptive
+synthetic bad-frame injection test
+thresholds; conservative class
+assignment
+Confidence
+Per-frame: OBSERVED /
+P0 100% of frames carry a confidence
+Classification
+HIGH / MEDIUM / LOW /
+label; no unlabelled outputs
+REJECTED with full audit trail
+Video Generation Dual MP4+WebM output;
+P0 Smooth playback at 15 fps; no silent
+frame-level metadata JSON;
+frame drops
+gap placeholder frames;
+streaming-ready
+WebGIS Interface OpenLayers map, animation
+P0 All FR-WEB requirements pass
+controls, confidence overlay,
+manual test
+comparison view, persistent
+disclaimer
+Evaluation Engine Held-out
+P1 Full report generated for 3 test
+PSNR/SSIM/LPIPS/tOF;
+datasets
+confidence calibration; HTML
+report
+REST API
+All pipeline stages controlled
+P1 100% endpoint documentation; <1%
+(FastAPI)
+via documented endpoints;
+failure on valid inputs
+OpenAPI spec
+Frame Export PNG + metadata JSON export
+P2 Export works for any frame in the
+per frame
+sequence
+MOSDAC INSAT
+INSAT-3D data via MOSDAC
+P2 Fetches 1-hour INSAT sequence in
+Integration
+API
+demo region
+Page 8 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+3.2 Hard Out-of-Scope Boundaries
+✗ CRITICAL: Absolute Scope Exclusions
+Scientific replacement of observed satellite data — interpolated frames are never to be treated as
+real observations.
+Numerical weather prediction or forecast generation of any future atmospheric state.
+Quantitative derived-product interpolation (precipitation estimation, wind speed, SST).
+Assimilation of interpolated frames into NWP models or any downstream scientific workflow.
+Real-time operational use for weather warnings, aviation, or emergency response.
+Polar-orbiting satellite data (Landsat, Sentinel-2) — revisit cycles are incompatible with frame
+interpolation.
+3D volumetric atmospheric modelling.
+Any claim that interpolated frames represent ground truth or observed reality.
+Page 9 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+4. Guardrails, Policies & Non-Negotiable Rules
+These rules are enforced at the system level — not optional, not configurable by the end user. Every
+module must comply with each applicable rule.
+4.1 Output Integrity Rules
+Rule OI-01 — Every Frame Must Carry a Provenance Label
+No frame may be delivered to the user or written to any output file without one of the following labels:
+Label Meaning Enforcement Point
+OBSERVED Original satellite data fetched
+Data Ingestion Module — set at
+directly from WMS endpoint
+fetch time
+INTERPOLATED_HIGH AI-generated; PSNR proxy ≥ 28
+Confidence Classifier — assigned
+dB; flow inconsistency < 0.05;
+after validation
+SSIM ≥ 0.85
+INTERPOLATED_MEDIUM AI-generated; SSIM 0.70–0.84;
+Confidence Classifier — assigned
+flow inconsistency 0.05–0.15
+after validation
+INTERPOLATED_LOW AI-generated; SSIM 0.60–0.69;
+Confidence Classifier — shown
+flow inconsistency 0.15–0.25; or
+with warning overlay
+large temporal gap
+REJECTED Generated frame fails minimum
+Confidence Classifier —
+quality; excluded from default
+substituted by gap frame
+output
+GAP No data available and no
+Gap Handler — inserted at all data-
+interpolation attempted; explicit
+missing positions
+placeholder
+Rule OI-02 — Disclaimer Is Non-Dismissible
+Every interpolated frame displayed in the WebGIS interface must carry a persistent watermark: "AI-
+GENERATED — NOT OBSERVED DATA." This watermark must be encoded both in the video file
+metadata and rendered as a UI overlay. The user must not be able to disable this watermark. The
+watermark must be visible in screenshots and video exports.
+Rule OI-03 — No Extrapolation Permitted
+The system interpolates only between two existing observed frames. It must never generate a frame
+that falls outside the temporal range of the two bounding observed frames. Extrapolation (predicting
+beyond the last known frame) is architecturally prohibited.
+Page 10 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Rule OI-04 — Gap Size Hard Limit
+No interpolation may be attempted across a temporal gap exceeding 30 minutes. If two consecutive
+observed frames are separated by more than 30 minutes, the pair is classified as a GAP and no
+intermediate frames are generated. This limit is not configurable by the end user.
+4.2 Data Quality Rules
+Rule DQ-01 — Input Frame Validation Before Interpolation
+Before any frame pair is passed to the interpolation engine, both frames must pass the following
+validation gate. Failure at any check aborts interpolation for that pair:
+Check Method Failure Action
+File integrity PNG/TIFF CRC check; re-
+Mark as MISSING if all retries fail
+download on failure (max 3
+retries)
+Dimension consistency Both frames must have
+Resize if within 5% tolerance; reject pair
+identical width × height
+if beyond
+Fill pixel fraction < 20% of pixels may be
+Reject pair if exceeded; mark as GAP
+fill/NaN values
+Mean pixel value Not 0.0 (all-black) or 255.0 (all-
+Mark as SENSOR_ERROR; exclude
+white)
+from interpolation
+Temporal order Frame t1 timestamp strictly <
+Swap if transposed; reject if equal
+Frame t2 timestamp
+timestamps
+Inter-frame MAD Mean Absolute Difference < 80
+Cap interpolation depth to 1 frame; flag
+(on 0–255 scale)
+pair
+Rule DQ-02 — Sequence Segmentation on Gaps
+When a gap (missing timestamp or gap > 30 min) is detected in the retrieved sequence, the sequence
+must be split into two independent sub-sequences at that point. No interpolation may bridge sub-
+sequence boundaries.
+Rule DQ-03 — Radiometric Consistency Enforcement
+If consecutive original frames show a radiometric jump exceeding 3 standard deviations of the session
+mean inter-frame MAD, a CALIBRATION_SHIFT flag is raised. Interpolation depth for that pair is
+capped at 1 frame and the pair is marked INTERPOLATED_LOW regardless of other metrics.
+Page 11 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+4.3 Model Governance Rules
+Rule MG-01 — Model Qualification Gate (Phase 0 Enforcement)
+No interpolation model may be used in the production pipeline until it passes the qualification gate on
+the satellite benchmark dataset. The gate criteria are:
+• PSNR ≥ 28 dB (mean across 50+ held-out frame pairs)
+• SSIM ≥ 0.80 (mean across same set)
+• LPIPS ≤ 0.15 (mean across same set)
+• No catastrophic failure (SSIM < 0.40) on any single pair in the set
+If RIFE 4.6 fails this gate, the fallback is Lucas-Kanade optical flow warping with bilateral filter post-
+processing. This decision is documented and logged.
+Rule MG-02 — Model Version Pinning
+The interpolation model version must be pinned in the system configuration and recorded in every job's
+audit log. Model updates must re-run the Phase 0 benchmark before deployment.
+Rule MG-03 — Conservative Confidence on Domain Edge Cases
+If the system detects a satellite-specific artefact (limb distortion zone, day-night terminator crossing,
+calibration shift flag), the output confidence is capped at INTERPOLATED_MEDIUM regardless of
+computed SSIM and flow metrics. This rule cannot be overridden at runtime.
+4.4 API & System Governance Rules
+Rule SG-01 — All API Inputs Validated
+Every REST API endpoint must validate all input parameters against a defined schema before
+processing. Invalid inputs return HTTP 422 with a structured error body — never HTTP 500.
+Rule SG-02 — All Pipeline Errors Are Classified
+Every exception in the pipeline must be caught, classified (RETRIABLE, NON_RETRIABLE,
+PARTIAL_FAILURE), and logged with a structured log entry. Unhandled exceptions at any stage are a
+testing failure.
+Rule SG-03 — Job Audit Log Is Mandatory
+Every pipeline job must produce a JSON audit log recording: job_id, input parameters, each stage's
+start/end time and status, frame-level confidence assignments, and final output file paths. This log is
+retained for 30 days.
+Page 12 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Rule SG-04 — No Silent Data Substitution
+If a frame is rejected or missing, the system must insert a labelled GAP placeholder. It must never
+silently duplicate an adjacent frame to fill the gap without labelling it as such.
+Page 13 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+5. Technical Architecture — Production Design
+5.1 System Component Map
+Component Technology Stack Key Responsibilities Interface
+Data Ingestion
+Python 3.11, aiohttp
+WMS fetch, auth, rate-limit
+Internal async API
+Service
+3.9, OWSLib 0.29,
+queue, cache, integrity check
+SQLite cache
+Preprocessing
+Python, rasterio 1.3,
+Alignment, normalisation, gap
+Python function
+Pipeline
+numpy, opencv-python
+detection, masking,
+calls
+4.9
+segmentation
+Interpolation
+PyTorch 2.1, RIFE 4.6
+Frame pair interpolation,
+Python class with
+Engine
+(fine-tuned) / LK optical
+recursive bisection, tiling for
+.interpolate(f1,f2,n)
+flow
+large images
+interface
+Statistical
+Python, opencv
+Flow consistency, SSIM, MAD;
+Python class with
+Plausibility Module
+(Farneback flow), scikit-
+adaptive threshold calibration
+.validate(frame, f1,
+image, numpy
+f2) interface
+Confidence
+Python (rule engine) Assigns label per frame; applies
+Python class with
+Classifier
+Rule MG-03 overrides;
+.classify(metrics)
+conservative merge
+interface
+Video Generator FFmpeg 6.0 via
+Dual MP4+WebM output, gap
+Subprocess
+ffmpeg-python; Python
+frames, metadata JSON,
+wrapper
+streaming segments
+REST API FastAPI 0.111,
+Job control, status, output
+HTTP REST +
+Pydantic v2, uvicorn
+retrieval, OpenAPI spec
+WebSocket for
+progress
+Job Queue Python asyncio task
+Async pipeline execution,
+FastAPI
+queue (dev);
+cancellation, progress events
+background tasks
+Celery+Redis
+(production)
+Frontend React 18, OpenLayers
+Map, playback, confidence
+Browser SPA
+9, Tailwind CSS 3
+overlay, comparison view,
+disclaimer
+Local Cache SQLite (metadata) +
+Frame deduplication, TTL
+Python sqlite3 +
+filesystem
+expiry, integrity index
+pathlib
+(frames/videos)
+Evaluation Module Python, scikit-image,
+PSNR, SSIM, LPIPS, tOF;
+Python script +
+lpips library, matplotlib
+calibration curves; HTML report
+FastAPI endpoint
+generation
+Page 14 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+5.2 End-to-End Data Flow — Authoritative Version
+Stage 1 — Job Submission
+• User submits job via REST API: {satellite, layer, bbox, start_time, end_time, interpolation_depth,
+region_preset}
+• API validates inputs (Rule SG-01); rejects with 422 on schema violation
+• Job record created with job_id, QUEUED status; audit log initialised
+Stage 2 — Data Ingestion (Module 6)
+• Check local cache; return cached frames if TTL valid
+• Build WMS request list for all timestamps in range at native cadence
+• Execute requests through rate-limit queue with exponential backoff
+• Validate each downloaded frame (Rule DQ-01); re-request on failure (max 3 retries)
+• Store to local cache with timestamp, bbox, source, checksum
+Stage 3 — Preprocessing (Module 7)
+• Spatial consistency check across all frames; reproject or reject misaligned
+• Radiometric normalisation to 0–1 float range per session
+• Gap detection; sequence segmentation at gaps > 30 min or > 3x nominal interval (Rule DQ-02)
+• Fill-pixel masking; limb zone masking; terminator detection
+Stage 4 — Interpolation & Validation (Modules 8 + 9)
+• For each valid frame pair in each sub-sequence:
+◦ → Check gap duration; reject pair if > 30 min (Rule OI-04)
+◦ → Run input validation gate (Rule DQ-01)
+◦ → Compute adaptive thresholds from session statistics
+◦ → Apply Interpolation Engine (recursive bisection to target depth)
+◦ → For each generated frame: compute flow consistency, SSIM, MAD
+◦ → Apply Rule MG-03 domain overrides
+◦ → Assign confidence label (Rule OI-01)
+◦ → Reject frames below threshold; insert GAP placeholder (Rule SG-04)
+Stage 5 — Video Generation (Module 10)
+• Assemble full frame sequence: [OBSERVED, INTERP*, OBSERVED, GAP?, OBSERVED, ...]
+• Generate dual output: original-only video and full interpolated video
+Page 15 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+• Embed metadata JSON sidecar with per-frame labels, timestamps, confidence
+• Generate HLS segments for streaming (optional, production mode)
+Stage 6 — Frontend Delivery (Module 11)
+• API returns job status, video URLs, metadata JSON, and evaluation report URL
+• Frontend fetches metadata to drive confidence overlay and timeline
+• WebGIS renders satellite layer on OpenLayers map with animation controls
+• Disclaimer overlay enforced on all interpolated frames (Rule OI-02)
+Page 16 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+6. Module 1 — Data Ingestion
+6.1 Functional Requirements
+ID Requirement Acceptance Criterion
+FR-DI-
+WMS Endpoint Configuration: Support
+Config schema validated by Pydantic;
+01
+parameterised WMS base URL, layer, bbox
+invalid config rejected with structured
+(WGS84), time range (ISO 8601), step, format
+error
+(PNG/GeoTIFF), resolution
+FR-DI-
+Time-Series Frame Retrieval: Fetch all
+Sequence complete for 6-hr GOES test;
+02
+available frames in range at native cadence;
+metadata includes timestamp, bbox,
+store with full metadata
+source, checksum
+FR-DI-
+Authentication Support: Optional Bearer token /
+MOSDAC fetch succeeds with valid
+03
+API key for MOSDAC endpoints; never expose
+token; credentials absent from all log
+credentials in logs or API responses
+outputs
+FR-DI-
+Rate-Limit Queue: Configurable max concurrent
+No 429 errors during standard 6-hr
+04
+requests (default 3); exponential backoff on
+fetch; backoff tested with mock server
+429; per-source rate config
+FR-DI-
+Local Cache: SQLite index + filesystem
+Cache hit avoids re-download; corrupted
+05
+storage; TTL configurable (default 24 hr);
+cache entry triggers fresh fetch
+integrity check on cache read
+FR-DI-
+GetCapabilities Parsing: Validate layer name
+Invalid layer name returns
+06
+and time range against WMS GetCapabilities
+FR_DI_ERROR_LAYER_NOT_FOUND
+before issuing data requests
+before any data request
+FR-DI-
+Missing Timestamp Detection: If WMS returns
+MISSING entries appear in audit log;
+07
+empty response for a timestamp, log as
+pipeline does not crash
+MISSING and continue
+FR-DI-
+Bounding Box Enforcement: Max bbox area
+Request exceeding limit is tiled and
+08
+enforced (default 90°×90°); large requests auto-
+stitched; user sees single output
+tiled
+6.2 Data Source Integration Specifications
+6.2.1 NASA GIBS (Primary)
+• Base URL: https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi
+• Authentication: NASA Earthdata token (Bearer header). Register at urs.earthdata.nasa.gov.
+Token stored in env var EARTHDATA_TOKEN — never hardcoded.
+• Recommended Layer — Thermal IR (Day+Night): GOES-
+East_ABI_Band13_Clean_Longwave_Window_BrightnessTemp
+• Recommended Layer — Visible (Daytime): GOES-East_ABI_Band2_Red_Visible_1km
+Page 17 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+• Rate limit: 60 req/min authenticated; 10 req/min unauthenticated. Max concurrent: 3.
+• Format: image/png; EPSG:4326 projection
+6.2.2 MOSDAC (Secondary — INSAT)
+• Base URL: https://mosdac.gov.in/live/wms (verify current endpoint at mosdac.gov.in)
+• Authentication: MOSDAC API token. Register at mosdac.gov.in. Token stored in
+MOSDAC_TOKEN env var.
+• Known issues: Endpoint names may change; validate via GetCapabilities before each session;
+build fallback to static INSAT archive if endpoint unavailable.
+• Priority: P2 — if MOSDAC is unavailable during development, use pre-downloaded INSAT data
+from archive.
+⚑ GUARDRAIL: Credential Security Policy
+All API tokens and credentials must be stored as environment variables or in a secrets manager.
+Credentials must never appear in: source code, config files, log files, API responses, or Git history.
+A pre-commit hook must scan for hardcoded credential patterns (use detect-secrets library).
+If a credential is accidentally committed, it must be rotated immediately and the Git history sanitised.
+Page 18 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+7. Module 2 — Preprocessing Pipeline
+7.1 Functional Requirements
+ID Requirement Acceptance Criterion
+FR-PP-
+Spatial Alignment: All frames verified to share
+Zero-tolerance: any dimension mismatch
+01
+identical bbox, projection, and pixel
+triggers reproject-or-reject
+dimensions
+FR-PP-
+Radiometric Normalisation: Pixel values
+Max pixel value in output tensor ≤ 1.0; min
+02
+normalised to [0.0, 1.0] float32 per-session
+≥ 0.0; no NaN values
+using session min/max (not hardcoded)
+FR-PP-
+Data Gap Detection & Segmentation: Missing
+Gap at t=N produces sub-sequences [0..N-
+03
+timestamps trigger sub-sequence split; gaps
+1] and [N+1..end]; verified by unit test
+> 3× nominal interval also trigger split
+FR-PP-
+Fill Pixel Masking: Fill/NaN pixels (≤ 5 DN or
+Masked pixels excluded from all quality
+04
+≥ 250 DN in uint8) identified and masked
+metric calculations
+before normalisation
+FR-PP-
+Limb Zone Masking: Geostationary limb
+Limb mask applied before interpolation;
+05
+pixels (typically >70° off nadir) identified via
+limb pixels excluded from SSIM/MAD
+satellite geometry and masked
+calculations
+FR-PP-
+Day-Night Terminator Detection: Frames
+Terminator flag in frame metadata; triggers
+06
+crossing the terminator boundary within the
+Rule MG-03 (cap confidence at MEDIUM)
+bbox flagged
+FR-PP-
+Radiometric Calibration Shift Detection: Inter-
+Flag appears in audit log; interpolation
+07
+frame MAD > 3σ of session mean triggers
+depth for flagged pair capped at 1
+CALIBRATION_SHIFT flag
+FR-PP-
+Sequence Report: Preprocessing outputs a
+Report generated for every pipeline run;
+08
+JSON summary of all frames, their status,
+inspectable via API endpoint
+and detected flags
+7.2 Satellite-Specific Preprocessing Notes
+GOES ABI Imagery
+• Band 13 (10.3 µm) brightness temperature: valid range ~160–330 K; normalise to this physical
+range first, then to [0,1].
+• Band 2 (0.64 µm) reflectance: valid range 0–1.3; clamp to [0,1] before normalisation.
+• Scan lines at image edges may contain fill values (-999 or 65535 in DN); mask before use.
+INSAT-3D Imagery
+• INSAT-3D TIR1 (10.8 µm): similar characteristics to GOES Band 13.
+Page 19 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+• Image format from MOSDAC is typically HDF5 or NetCDF4 — not PNG. Requires
+rasterio/xarray for reading.
+• Reprojection from native INSAT projection to EPSG:4326 required using rasterio.warp.
+Himawari AHI Imagery
+• Available via AWS S3 (noaa-himawari8 bucket) in HSD binary format or NetCDF.
+• Requires satpy or himawari-8-reader for format parsing.
+Page 20 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+8. Module 3 — Interpolation Engine
+8.1 Model Selection — Resolved Architecture
+The domain gap issue identified in PRD v1.0 is resolved by the following mandatory decision tree.
+Model selection is data-driven, not assumed.
+Decision Step Criterion Outcome
+Phase 0 Benchmark: Test
+PSNR ≥ 28 dB AND SSIM ≥
+PROCEED with RIFE 4.6 fine-
+RIFE 4.6 on 50+ GOES held-
+0.80 AND LPIPS ≤ 0.15
+tuned on satellite data
+out pairs
+RIFE 4.6 fails Phase 0
+PSNR < 28 dB or SSIM < 0.80 Test FILM (Google)
+benchmark
+FILM fails Phase 0 benchmark PSNR < 28 dB or SSIM < 0.80 Fall back to Lucas-Kanade optical
+flow warping (always passes
+minimum bar)
+Optional (if time permits) Any model reaches Phase 0
+Fine-tune on 30-day GOES
+gate
+archive for additional +2–4 dB
+PSNR gain
+⚠ WARNING: DAIN Is Permanently Removed
+DAIN (Depth-Aware Video Frame Interpolation) requires monocular depth maps as input.
+Satellite imagery has no depth dimension. DAIN cannot be used and has been removed from all
+architecture diagrams.
+Do not re-add DAIN to any system component. This decision is final.
+8.2 RIFE Fine-Tuning Strategy
+8.2.1 Training Data
+• Source: NOAA GOES-16 ABI Level-1b data from AWS S3 (s3://noaa-goes16/ABI-L1b-RadF/)
+• Period: 1 calendar month (e.g., June 2023 — mix of convective and stratiform conditions)
+• Band: Band 13 (thermal IR) — day/night valid, cloud motion clearly visible
+• Volume: ~4,320 full-disk images (10-min cadence × 30 days). Download ~100 GB compressed.
+• Split: 80% train / 10% validation / 10% test. Split by day — no temporal leakage.
+8.2.2 Training Setup
+• Input: Frame pairs (t, t+10 min). Supervised target: t+5 min (midpoint, withheld).
+Page 21 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+• Loss: L1 reconstruction loss + perceptual loss (VGG-16 features) + flow smoothness
+regularisation.
+• Hardware minimum: GPU with 8 GB VRAM. Training time: ~12–24 hours.
+• Fine-tuning strategy: Freeze RIFE backbone; train only optical flow and synthesis modules.
+Reduces training time to ~4–6 hours.
+8.2.3 Fallback — Lucas-Kanade Optical Flow Warping
+• No training required. Deterministic. Always produces an output.
+• Implementation: Compute dense optical flow (cv2.calcOpticalFlowFarneback) between frame
+pair. Warp each frame toward the midpoint. Blend using alpha=0.5.
+• Post-process with bilateral filter to reduce warping artifacts.
+• Expected PSNR: 24–27 dB (lower than RIFE but physically more interpretable).
+• This fallback always serves as a baseline comparison in the evaluation report.
+8.3 Functional Requirements
+ID Requirement Acceptance Criterion
+FR-INT-
+Model interface: .interpolate(frame1, frame2,
+Unit test: given two known frames, returns n
+01
+n) returns list of n intermediate frames as
+frames with correct shape and value range
+float32 tensors
+FR-INT-
+Recursive bisection: Midpoint generated
+Verified by inspecting generation order in
+02
+first; then midpoints of halves; not sequential
+unit test
+generation
+FR-INT-
+Configurable depth: n is per-job
+Invalid depth for gap duration returns error,
+03
+configurable; enforced against gap-duration
+not a result
+limits (see table below)
+FR-INT-
+Image tiling: If image exceeds 1024×1024
+No OOM error on 2048×2048 input;
+04
+pixels, auto-tile into overlapping patches;
+stitching artefacts < 2 px SSIM difference at
+stitch outputs with feathered blending
+seam
+FR-INT-
+CPU/GPU agnostic: Pipeline runs on CPU
+Tested on both CPU and CUDA; results
+05
+(slower) or CUDA GPU (faster) without code
+identical within float32 tolerance
+changes
+FR-INT-
+Model version recorded: Model name,
+Audit log contains model_name,
+06
+version, and checkpoint hash written to
+model_version, checkpoint_sha256 fields
+every job audit log
+Gap Duration Max Interpolation
+Effective Output
+Rationale
+Depth (n)
+Cadence
+≤ 5 min Up to 15 ~20 sec Very short gap — high reliability
+Page 22 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Gap Duration Max Interpolation
+Effective Output
+Rationale
+Depth (n)
+Cadence
+5–10 min Up to 9 ~60 sec Short gap — RIFE performs well
+10–15 min Up to 5 ~2.5 min Moderate gap — acceptable
+quality
+15–30 min Up to 2 ~7.5–10 min Large gap — reduced reliability;
+2 frames max
+> 30 min 0 (no interpolation) N/A (GAP
+Architecturally prohibited — Rule
+placeholder)
+OI-04
+Page 23 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+9. Module 4 — Statistical Plausibility & Confidence
+System
+ℹ NOTE: Terminology Correction from v1.0
+This module was called "Accuracy Control" in the original proposal and "Validation" in PRD v1.0.
+Its correct name is "Statistical Plausibility Module" — it verifies visual and statistical consistency,
+NOT physical correctness.
+Physical correctness cannot be verified without NWP comparison, which is out of scope.
+All documentation, code, and UI labels must use this precise terminology.
+9.1 Adaptive Threshold Calibration
+Static thresholds fail for different regions, seasons, and cloud regimes. This module uses adaptive
+calibration:
+• At session start, compute baseline statistics from the first 10 original frames: mean inter-frame
+MAD, mean inter-frame SSIM, optical flow magnitude distribution.
+• Set session-specific thresholds as percentiles of these baseline distributions (e.g., MAD
+threshold = 90th percentile of baseline inter-frame MAD).
+• If < 5 original frames available (short time range), fall back to hardcoded global defaults.
+• Log all threshold values used in the session audit log.
+9.2 Validation Metrics
+Metric Computation Purpose Adaptive Threshold
+Forward-Backward
+Compute optical flow F→I
+Detects unstable
+Session 90th
+Flow Inconsistency
+and I→F; measure EPE
+motion fields; identifies
+percentile EPE of
+(endpoint error)
+occlusion boundaries
+original pairs
+SSIM (vs both
+skimage.ssim(interpolated,
+Structural plausibility;
+Minimum: 0.60 (hard
+bounding frames)
+frame_before) +
+catches ghosting and
+floor); session-
+skimage.ssim(interpolated,
+blurring
+adaptive target
+frame_after) / 2
+Mean Absolute
+np.mean(np.abs(frame_n -
+Detects unrealistic
+Session 95th
+Difference (MAD)
+frame_n_minus_1)) on
+pixel jumps between
+percentile MAD of
+consecutive output frames
+sequential outputs
+original pairs
+Intensity
+|sum(interpolated_pixels) -
+Proxy for mass
+< 5% deviation
+Conservation
+lerp(sum(f1), sum(f2), t)| /
+conservation in cloud
+(configurable)
+sum(f1)
+systems; detects
+hallucinated clouds
+Page 24 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Metric Computation Purpose Adaptive Threshold
+LPIPS (evaluation
+lpips.LPIPS model (AlexNet
+Perceptual quality;
+Evaluation metric only
+only)
+backbone)
+correlates better with
+— not used for real-
+human judgment
+time confidence
+classification
+9.3 Confidence Classification Rules
+Label Gate Criteria (ALL must be met) Overrides (ANY trigger
+downgrade)
+OBSERVED Source is WMS fetch; no AI
+—
+processing
+INTERPOLATED_HIGH SSIM ≥ 0.85; EPE < session-
+Limb zone; terminator crossing;
+adaptive; MAD < adaptive;
+calibration shift → cap at MEDIUM
+intensity deviation < 5%
+INTERPOLATED_MEDIUM SSIM 0.70–0.84; EPE moderate;
+Gap duration 20–30 min → cap at
+MAD moderate
+MEDIUM
+INTERPOLATED_LOW SSIM 0.60–0.69; or large EPE; or
+Gap duration 15–20 min may
+high MAD
+trigger LOW
+REJECTED SSIM < 0.60; or EPE > 2×
+Always substituted by GAP
+adaptive threshold; or MAD > 3×
+placeholder in output
+adaptive threshold
+GAP No data available; or pair rejected
+Always labelled; never silently
+by Rule OI-04; or all interpolations
+skipped
+for pair rejected
+⚑ GUARDRAIL: Conservative Merge Rule
+When multiple metrics disagree on confidence class, the LOWEST class wins.
+Example: SSIM says HIGH, EPE says MEDIUM → result is MEDIUM.
+Example: SSIM says MEDIUM, EPE says REJECTED → result is REJECTED.
+This rule cannot be overridden. It is the primary defence against false HIGH confidence labels.
+Page 25 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+10. Module 5 — Video Generation
+10.1 Functional Requirements
+ID Requirement Acceptance Criterion
+FR-VG-
+Dual output: original-only video (native
+4 video files per job; all play correctly in
+01
+cadence) + full interpolated video
+Chrome, Firefox, Safari
+(enhanced cadence), both as MP4 and
+WebM
+FR-VG-
+Frame rate: Target 15 fps for standard
+Output video reports correct fps via ffprobe
+02
+output; configurable 10–24 fps
+FR-VG-
+Gap placeholder: Rejected or missing
+Gap frames visible in playback; not silently
+03
+frames replaced by a standardised dark
+skipped
+frame with centred text "DATA GAP —
+[timestamp]"
+FR-VG-
+Metadata JSON sidecar: Per-frame array
+JSON file present alongside each video;
+04
+with {frame_index, timestamp, type,
+parseable by frontend
+confidence, is_observed} for every frame
+FR-VG-
+Streaming-ready HLS: Optional
+HLS playback works in browser without full
+05
+(production mode) — generate .m3u8
+download; latency < 5 sec to first frame
+playlist + .ts segments for progressive
+loading
+FR-VG-
+Watermark burn-in: "AI-GENERATED —
+Watermark visible in video file itself (not just
+06
+NOT OBSERVED DATA" text burned into
+overlay); survives download
+video track for all interpolated frames
+FR-VG-
+Memory efficiency: Frame assembly
+Peak RAM during video generation < 2 GB for
+07
+streams to FFmpeg via pipe; never loads
+24-hour sequences
+all frames into RAM simultaneously
+10.2 FFmpeg Command Reference
+The following encoding parameters are specified for consistent output quality:
+• MP4 (H.264): -c:v libx264 -crf 18 -preset slow -pix_fmt yuv420p -movflags +faststart
+• WebM (VP9): -c:v libvp9 -cq 30 -b:v 0 -pix_fmt yuv420p
+• -movflags +faststart ensures MP4 streams without full download (required for browser playback)
+• Watermark filter: -vf "drawtext=text='AI-GENERATED — NOT OBSERVED
+DATA':fontsize=18:fontcolor=white:box=1:boxcolor=red@0.7:x=10:y=10"
+Page 26 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+11. Module 6 — WebGIS Frontend
+11.1 Functional Requirements
+ID Requirement Acceptance Criterion
+FR-
+Interactive map: OpenLayers 9 base
+Map renders at < 3 sec; satellite layer toggles
+WEB-01
+map (OSM/CartoDB) with satellite layer
+without page reload
+toggle; zoom/pan; bbox selection tool
+FR-
+Job submission panel: Input form for
+Form validates locally before API call; shows
+WEB-02
+satellite, layer, bbox, time range,
+validation errors inline
+interpolation depth; submit to API
+FR-
+Animation playback: Play/Pause/Step
+All controls functional; speed change takes
+WEB-03
+Forward/Step Backward/Speed (0.25×–
+effect within 1 playback cycle
+4×)/Jump to Frame
+FR-
+Confidence timeline: Below video, a
+Timeline updates in sync with playback; clicking
+WEB-04
+colour-coded bar shows confidence per
+a frame jumps to it
+frame (green=OBSERVED, blue=HIGH,
+amber=MEDIUM, red=LOW,
+grey=GAP)
+FR-
+Frame info panel: Current timestamp,
+Updates every frame change; no display lag >
+WEB-05
+frame type
+100 ms
+(OBSERVED/INTERPOLATED),
+confidence label, gap warning if
+applicable
+FR-
+Persistent disclaimer: Red banner "AI-
+Disclaimer present in DOM inspection; visible in
+WEB-06
+GENERATED FRAMES — NOT
+screenshots; confirmed in 10-user test
+OBSERVED DATA" always visible
+during interpolated playback; cannot be
+closed
+FR-
+Side-by-side comparison: Two
+Both players within 1 frame of each other at all
+WEB-07
+synchronised players — left = original
+times; verified by automated test
+cadence, right = interpolated; shared
+scrubber
+FR-
+WMS proxy: All WMS requests to NASA
+No API tokens in browser network inspector; no
+WEB-08
+GIBS and MOSDAC proxied through
+CORS errors
+backend; no credentials in frontend
+code
+FR-
+Job status polling: WebSocket or SSE
+Progress updates every ≤ 5 sec; connection
+WEB-09
+connection for real-time pipeline
+recovers from temporary disconnect
+progress during job execution
+Page 27 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+ID Requirement Acceptance Criterion
+FR-
+Mobile responsiveness: Core playback
+Manual test on both platforms; layout does not
+WEB-10
+and map features functional on iOS
+break at 375 px width
+Safari 16+ and Android Chrome 110+
+11.2 Confidence Label Colour System
+Label Colour Hex UI Elements Using This Colour
+OBSERVED Green #2E7D32 Timeline bar, frame badge, border
+highlight
+INTERPOLATED_HIGH Teal/Blue #0277BD Timeline bar, frame badge
+INTERPOLATED_MEDIUM Amber #F57F17 Timeline bar, frame badge, info
+panel warning
+INTERPOLATED_LOW Orange #E65100 Timeline bar, frame badge, warning
+tooltip
+REJECTED / GAP Mid-Grey #757575 Timeline bar; dark gap frame in
+video
+⚑ GUARDRAIL: Disclaimer Enforcement
+The disclaimer banner must be implemented as a fixed CSS element that cannot be hidden by user
+CSS overrides.
+It must also be burned into the video file (Rule OI-02 / FR-VG-06) so it is visible even when video is
+downloaded.
+Automated test: Download video file; run ffprobe; confirm drawtext watermark in video metadata.
+The disclaimer colour must maintain a minimum contrast ratio of 4.5:1 (WCAG AA) against its
+background.
+Page 28 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+12. Module 7 — Evaluation Engine
+The evaluation engine is a first-class module, not an afterthought. Its output is the primary evidence of
+system effectiveness for the academic report and viva defence.
+12.1 Held-Out Frame Test Protocol
+1. 2. 3. 4. 5. 6. Select 5 test datasets covering different weather regimes: tropical cyclone, mid-latitude cold
+front, convective system, slow-moving stratiform cloud, and a clear-sky / low-cloud contrast
+case.
+For each dataset, fetch at native cadence (e.g., GOES 10-min for 6 hours = 37 frames).
+Withhold every 3rd frame (simulating 30-min cadence input). Reconstruct withheld frames using
+the pipeline.
+Compare reconstructed vs. actual withheld frames using PSNR, SSIM, and LPIPS.
+Also run the LK optical flow warping baseline on the same pairs and report its metrics alongside.
+Compute per-event metrics and aggregate statistics. Report mean, median, std dev, and
+min/max per metric.
+12.2 Required Evaluation Metrics
+Metric Library / Tool Target
+Target (LK
+Interpretation
+(RIFE)
+Baseline)
+PSNR (dB) skimage.metrics.peak_signal_noise_ratio ≥ 28 dB ≥ 24 dB Higher is
+better; < 25 dB
+= poor quality
+SSIM skimage.metrics.structural_similarity ≥ 0.80 ≥ 0.70 Higher is
+better; < 0.60
+=
+unacceptable
+LPIPS lpips library (AlexNet) ≤ 0.15 ≤ 0.25 Lower is
+better;
+correlates with
+human
+perception
+tOF
+cv2.calcOpticalFlowFarneback on output
+< 1.5×
+< 2.0×
+Measures
+(temporal
+sequence
+original
+original tOF
+motion
+optical flow)
+tOF
+smoothness
+vs. original
+Page 29 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Metric Library / Tool Target
+Target (LK
+Interpretation
+(RIFE)
+Baseline)
+Confidence
+Custom: % of HIGH-labelled frames with
+≥ 80% N/A (no
+Measures
+Precision
+SSIM ≥ 0.85
+confidence
+classifier
+for LK)
+reliability
+Rejection
+% of generated frames classified as
+Document;
+N/A High rejection
+Rate
+REJECTED
+no target
+rate in
+complex
+events is
+expected and
+acceptable
+12.3 Evaluation Report Output
+• Automated HTML report generated per evaluation run.
+• Contents: metric tables, per-event breakdown, visual examples (worst and best frame pairs),
+confidence calibration plot, comparison vs. LK baseline.
+• Report also accessible via FastAPI endpoint: GET /api/v1/evaluation/{job_id}/report
+• Report must be included in full in the major project dissertation appendix.
+Page 30 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+13. Edge Case Registry — Complete & Resolved
+Every edge case is paired with its detection method, handling strategy, and the specific rule or guardrail
+that enforces the handling.
+13.1 Data Ingestion Edge Cases
+Edge Case Detection Resolved Handling Governing
+Rule
+WMS server down HTTP 5xx or
+Exponential backoff ×3; after 3
+Rule SG-02
+timeout
+failures, return
+RETRIABLE_ERROR to user with
+retry-after suggestion
+Layer unavailable for
+GetCapabilities
+Validate time range against layer
+FR-DI-06
+time range
+check before fetch
+temporal extent; return FR-
+DI_LAYER_TIME_MISMATCH
+before any data request
+Authentication failure HTTP 401/403 Return AUTH_FAILURE with link to
+FR-DI-03
+credential renewal page; log event
+without exposing token
+Rate limit (HTTP 429) Response status
+Token bucket + exponential
+FR-DI-04
+code
+backoff; request queue with
+configurable max-concurrency
+(default 3); cache aggressively
+Partial / corrupted
+PNG/TIFF CRC
+Re-request up to 3 times; if all fail,
+Rule DQ-01
+download
+decode error
+mark timestamp as MISSING
+Missing timestamp
+No valid WMS
+Log as MISSING; continue
+FR-DI-07, Rule
+(data outage)
+response
+sequence; gap detector will
+DQ-02
+segment sub-sequence at this point
+Bounding box too large Image size > 50
+Auto-tile: split into overlapping sub-
+FR-DI-08
+MB or > 90°×90°
+tiles, fetch each, mosaic outputs;
+user sees single result
+All-zero image
+Mean pixel = 0.0
+Mark as SENSOR_ERROR;
+Rule DQ-01
+response
+after normalisation
+exclude from interpolation; insert
+GAP placeholder
+Projection not
+GetCapabilities
+Attempt reproject via rasterio; if
+FR-DI-01
+supported
+SRS list check
+fails, return PROJECTION_ERROR
+GetCapabilities XML
+XML parse
+Fall back to hardcoded layer list; log
+FR-DI-06
+malformed
+exception
+CAPABILITIES_PARSE_WARN;
+continue
+Page 31 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Edge Case Detection Resolved Handling MOSDAC API down HTTP 5xx / DNS
+MOSDAC is P2 feature; fall back to
+failure
+static INSAT demo archive; log
+MOSDAC_UNAVAILABLE
+13.2 Preprocessing Edge Cases
+Edge Case Detection Resolved Handling Frame dimension
+Shape comparison
+Resize to target resolution if within
+mismatch
+across all frames
+5% tolerance; log
+DIMENSION_ADJUSTED; reject
+pair if > 5%
+All-black frame
+Mean normalised
+If thermal IR band: may be valid
+(sensor/night error)
+pixel < 0.02
+cold cloud — keep with
+SENSOR_DARK flag. If visible
+band at daytime: mark
+SENSOR_ERROR.
+All-white frame Mean normalised
+Mark SENSOR_ERROR; exclude
+pixel > 0.98
+from interpolation
+> 20% fill pixels Fill pixel counter Reject pair; both frames marked
+FILL_HEAVY; GAP inserted
+Limb zone pixels Satellite geometry
+Mask limb zone; exclude masked
+calculation
+pixels from all quality metrics
+Day-night terminator
+Solar zenith angle
+Flag pair TERMINATOR; cap output
+crossing
+calculation for
+confidence at MEDIUM (Rule MG-
+bbox
+03); interpolation still attempted
+Calibration shift
+Inter-frame MAD >
+Flag CALIBRATION_SHIFT; cap
+between frames
+3σ session mean
+interpolation depth to 1; label all
+outputs from this pair
+INTERPOLATED_LOW
+Only 1 frame retrieved Frame count
+Abort interpolation for this job;
+check
+return single original frame; inform
+user INSUFFICIENT_FRAMES
+Duplicate frames (same
+MD5 hash
+Deduplicate before processing; log
+timestamp)
+comparison
+DUPLICATE_REMOVED
+NaN values in
+numpy isnan()
+Replace with interpolated value
+normalised array
+check
+from spatial neighbours using
+inpainting; log INPAINT_APPLIED
+Governing
+Rule
+FR-DI-03
+Governing
+Rule
+FR-PP-01
+Rule DQ-01
+Rule DQ-01
+FR-PP-04
+FR-PP-05
+FR-PP-06
+FR-PP-07,
+Rule DQ-03
+FR-PP-03
+FR-PP-03
+FR-PP-04
+Page 32 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+13.3 Interpolation Engine Edge Cases
+Edge Case Detection Resolved Handling Rapid cloud formation
+High EPE +
+Classify outputs as LOW; reduce
+(new cloud appears)
+sudden intensity in
+depth to 1; annotate with
+region where f1
+RAPID_FORMATION flag
+had none
+Rapid cloud dissipation
+Intensity
+Classify outputs as LOW; annotate
+(cloud vanishes)
+conservation
+RAPID_DISSIPATION flag
+deviation > 10%
+Fast cyclone eye
+Optical flow
+Reduce depth by half; classify as
+motion (> 50 px/frame)
+magnitude
+MEDIUM; annotate FAST_MOTION
+histogram
+Chaotic / turbulent
+EPE > 2× adaptive
+Reject all interpolated frames for
+motion
+threshold
+this pair; insert GAP; log
+CHAOTIC_MOTION
+RIFE OOM error on
+CUDA OOM
+Auto-tile: split frame into 512×512
+GPU
+exception
+overlapping patches; run RIFE per
+patch; feather-blend stitching
+All interpolated frames
+100% REJECTED
+Fall back to LK optical flow warping
+rejected
+by confidence
+for this pair; if still rejected, insert
+classifier
+GAP; never crash
+Identical frame pair (no
+SSIM(f1,f2) > 0.99 Linear blend at each intermediate
+motion)
+timestep; classify all as HIGH
+confidence
+Gap between frames >
+Timestamp
+Architecturally blocked by Rule OI-
+30 min
+arithmetic
+04; GAP placeholder inserted; no
+interpolation attempted
+Interpolation depth >
+Depth config vs.
+Cap depth at table maximum; log
+allowed for gap
+gap duration table
+DEPTH_CAPPED; continue with
+capped depth
+f1 or f2 fails input
+Rule DQ-01
+Abort interpolation for this pair;
+validation gate
+checks
+insert GAP; log which check failed
+13.4 Validation & Confidence Edge Cases
+Governing
+Rule
+Rule MG-03
+Module 9
+intensity
+conservation
+metric
+Rule MG-03
+Rule DQ-01,
+Rule SG-04
+FR-INT-04
+Rule SG-04
+FR-INT-02
+Rule OI-04
+FR-INT-03
+Rule DQ-01
+Page 33 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Edge Case Detection Resolved Handling Optical flow fails to
+EPE computation
+Use SSIM and MAD only for
+converge (uniform
+returns NaN or
+confidence classification; log
+texture)
+diverges
+FLOW_CONVERGENCE_FAILURE;
+do not classify as REJECTED solely
+for this
+All frames
+100% non-HIGH
+Output all frames with labels; do not
+LOW/REJECTED
+outputs
+suppress; log COMPLEX_EVENT;
+(complex event)
+show prominent warning in UI
+No baseline frames
+< 5 original
+Use hardcoded global defaults; log
+for adaptive
+frames in session
+ADAPTIVE_CALIBRATION_SKIPPED
+calibration
+Metric conflict (SSIM
+Cross-metric
+Conservative merge: take lowest class
+HIGH, EPE
+comparison
+(REJECTED wins). Document in audit
+REJECTED)
+log.
+SSIM library failure scikit-image
+Log SSIM_COMPUTATION_ERROR;
+exception
+skip SSIM for this frame; use EPE and
+MAD only; cap confidence at LOW
+Limb zone metric
+Limb mask not
+Preprocessing must apply limb mask
+contamination
+applied before
+before passing frames to validation.
+SSIM/MAD
+This is a preprocessing bug —
+detected by unit test.
+13.5 Video Generation Edge Cases
+Edge Case Detection Resolved Handling FFmpeg not installed subprocess.run("ffmpeg
+Detect at system startup; raise
+-version") fails
+FFMPEG_NOT_FOUND with
+installation instructions; block all
+video generation
+Very long sequence
+Frame count check Stream frames to FFmpeg via
+(> 1000 frames)
+pipe (stdin); never buffer all in
+memory; verified by memory
+profiler
+Variable confidence
+Alternating
+Insert labelled dark gap frame at
+creates visual
+HIGH/GAP/HIGH
+all REJECTED positions; do not
+discontinuity
+pattern
+silently skip or duplicate
+neighbours
+Codec incompatibility Browser user-agent
+Generate both H.264 MP4 and
+detection
+VP9 WebM; serve MP4 to
+Governing
+Rule
+Conservative
+merge rule
+Rule OI-01,
+OI-02
+Module 9
+calibration
+spec
+Conservative
+merge rule
+Rule SG-02
+FR-PP-05
+Governing
+Rule
+Rule SG-02
+FR-VG-07
+Rule SG-04
+FR-VG-01
+Page 34 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Edge Case Detection Resolved Handling Chrome/Edge/Safari; WebM to
+Firefox as fallback
+HLS segment
+ffmpeg HLS output
+Fall back to direct MP4 download
+generation fails
+error
+mode; log
+HLS_GENERATION_FAILED;
+inform user of fallback
+Watermark rendering
+FFmpeg drawtext filter
+Block video output; return
+fails
+error
+VIDEO_GEN_ERROR; never
+deliver unwatermarked
+interpolated video
+Disk space exhausted
+IOError / ENOSPC Catch exception; clean up partial
+during write
+files; return STORAGE_ERROR;
+do not corrupt cache
+13.6 WebGIS Frontend Edge Cases
+Edge Case Detection Resolved Handling Large video file blocks
+Video file > 100
+Use HLS streaming (FR-VG-05); if
+UI
+MB
+unavailable, progressive download
+with canplay event
+User zooms beyond
+Zoom level > data
+Cap zoom; show tooltip "Maximum
+data resolution
+native resolution
+resolution reached for this dataset"
+CORS error on WMS
+Browser network
+All WMS requests proxied through
+fetch
+console error
+FastAPI backend (FR-WEB-08); no
+direct browser-to-WMS calls
+Comparison view
+Video timestamp
+Single timestamp controller drives
+desync
+drift > 1 frame
+both video elements via
+between left and
+.currentTime sync; tested every 500
+right players
+ms
+WebSocket disconnect
+ws.onerror /
+Auto-reconnect with exponential
+during job
+ws.onclose event
+backoff (max 5 attempts); fall back
+to HTTP polling if WS unavailable
+Job cancelled mid-run User navigates
+DELETE /api/v1/jobs/{job_id}
+away or explicitly
+endpoint; pipeline checks
+cancels
+cancellation flag at each stage;
+partial outputs cleaned up
+Mobile: touch controls
+Pinch-to-zoom
+Separate touch zones: top 60% =
+for map
+conflicts with video
+map, bottom 40% = player controls;
+scrubber
+no overlap
+Governing
+Rule
+FR-VG-05
+Rule OI-02
+Rule SG-02
+Governing
+Rule
+FR-WEB-09
+FR-WEB-01
+FR-WEB-08
+FR-WEB-07
+FR-WEB-09
+Rule SG-03
+FR-WEB-10
+Page 35 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Edge Case Detection Resolved Handling Governing
+Rule
+API returns unexpected
+Server error during
+Frontend shows structured error
+Rule SG-01
+500
+job execution
+from API (Rule SG-01); never
+"Something went wrong" with no
+details
+Page 36 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+14. Non-Functional Requirements
+ID Requirement Measurable Target Measurement
+Method
+NFR-
+Pipeline throughput (CPU) 1-hour GOES
+Time pipeline
+01
+sequence (7 frame
+with stopwatch;
+pairs, 7 interps each =
+record in
+49 frames) processed
+benchmark log
+in < 5 min on 8-core
+CPU
+NFR-
+Pipeline throughput (GPU) Same workload < 45
+GPU benchmark;
+02
+sec on NVIDIA RTX
+document
+3060 or equivalent
+hardware used
+NFR-
+Interpolation quality (PSNR) Mean PSNR ≥ 28 dB
+Evaluation
+03
+on held-out test set
+Engine report
+NFR-
+Interpolation quality (SSIM) Mean SSIM ≥ 0.80 on
+Evaluation
+04
+held-out test set
+Engine report
+NFR-
+Interpolation quality (LPIPS) Mean LPIPS ≤ 0.15 on
+Evaluation
+05
+held-out test set
+Engine report
+NFR-
+Confidence classifier
+≥ 80% of HIGH-
+Evaluation
+06
+precision
+labelled frames
+Engine
+achieve SSIM ≥ 0.85
+calibration report
+against GT
+NFR-
+WebGIS load time Initial page load < 5
+Chrome
+07
+sec on localhost; < 10
+DevTools
+sec on network
+Lighthouse score
+NFR-
+Video playback smoothness No dropped frames at
+Browser
+08
+15 fps in Chrome and
+DevTools frame
+Firefox
+timing
+NFR-
+API reliability < 1% failure rate on
+Automated
+09
+100 valid test requests
+integration test
+across all endpoints
+suite
+NFR-
+Memory usage (peak) Peak RAM during full
+Python memory-
+10
+pipeline < 4 GB
+profiler report
+NFR-
+Disclaimer visibility Disclaimer present on
+Automated frame
+11
+100% of interpolated
+scan + visual
+frames (video + UI
+inspection
+overlay)
+NFR-
+API documentation 100% of FastAPI
+OpenAPI spec
+12
+endpoints have
+review
+OpenAPI description,
+Status
+Test in Phase
+0
+Test if GPU
+available
+Phase 6 gate
+Phase 6 gate
+Phase 6 gate
+Phase 6 gate
+Phase 5 test
+Phase 5 test
+Phase 5 gate
+Phase 4
+benchmark
+Phase 5 gate
+Phase 5 gate
+Page 37 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+ID Requirement Measurable Target Measurement
+Status
+Method
+parameter docs, and
+example responses
+NFR-
+Code test coverage ≥ 80% line coverage
+pytest-cov report Continuous —
+13
+on all pipeline modules
+CI gate
+(not frontend)
+NFR-
+Audit log completeness Every completed job
+Log schema
+Automated
+14
+has a parseable audit
+validation script
+test
+log with all required
+fields
+Page 38 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+15. Testing Strategy
+15.1 Four-Tier Testing Model
+Tier Scope Tools Pass Gate Frequency
+Unit Tests Every function in every
+pytest, pytest-mock,
+100% of all edge
+Every commit
+pipeline module; all
+hypothesis (property
+case handlers
+(CI)
+edge case handlers; all
+testing)
+have a test;
+confidence rules
+overall module
+coverage ≥ 80%
+Integration
+Module-to-module
+pytest, httpx
+All 100 API test
+Every PR
+Tests
+interfaces; API
+(async), Wiremock
+requests pass; no
+merge
+endpoints; WMS mock
+for WMS mock
+500 errors on
+server; FFmpeg
+valid inputs
+integration
+End-to-End
+Full pipeline from job
+pytest + Playwright
+All 3 datasets
+Before each
+Tests
+submission to video
+for UI; real WMS
+produce valid
+phase gate
+delivery on 3 real
+calls to NASA GIBS
+video output; all
+datasets
+E-0X checklist
+items pass
+Performance
+Pipeline timing
+pytest-benchmark,
+All NFR targets
+Phase 6
+Tests
+(CPU+GPU); memory
+memory-profiler,
+met or
+profiling; video
+Playwright
+documented as
+playback stress test
+performance API
+exception with
+rationale
+15.2 Mandatory Test Cases — Edge Case Coverage
+The following test cases must be written and pass before Phase 5 begins:
+Test
+Edge Case Being Tested Method
+ID
+TC-01 WMS server returns HTTP 429 —
+Mock WMS server returns 429 for first 3 requests;
+rate limit handling
+verify backoff and eventual success
+TC-02 Frame with > 20% fill pixels —
+Inject synthetic frame with 25% fill pixels; verify pair
+rejection
+marked GAP
+TC-03 Gap > 30 min between frames — no
+Provide frame pair with 45-min gap; verify no
+interpolation
+interpolation attempted; GAP inserted
+TC-04 All RIFE outputs rejected — fallback
+Mock RIFE to return all-zero frames; verify system
+to LK
+falls back to LK warping
+Page 39 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Test
+Edge Case Being Tested Method
+ID
+TC-05 Calibration shift detection Inject frame pair with MAD = 4σ above session
+mean; verify CALIBRATION_SHIFT flag and depth
+cap
+TC-06 Terminator crossing — confidence
+Inject pair with day-night terminator; verify maximum
+cap
+confidence is MEDIUM
+TC-07 GPU OOM — auto-tiling Mock RIFE to raise CUDA OOM on full image; verify
+auto-tile activates
+TC-08 Disclaimer present in video file Generate video; run ffprobe; check drawtext
+watermark in video stream
+TC-09 Comparison view sync — never > 1
+Automated Playwright test: play both videos for 10
+frame drift
+sec; verify timestamp diff < 1 frame
+TC-10 Corrupt PNG download — retry and
+Mock download: first request returns corrupted PNG;
+succeed
+second returns valid; verify final frame is valid
+TC-11 Conservative merge: SSIM HIGH +
+Unit test: inject conflicting metrics; verify REJECTED
+EPE REJECTED → REJECTED
+label is assigned
+TC-12 Single-frame session — no crash Job with 1-frame time range; verify pipeline returns
+single original frame without crash
+TC-13 Audit log completeness Complete a job; parse audit log JSON; validate all
+required fields present
+TC-14 No credentials in API response or
+Run job with MOSDAC token; inspect all API
+logs
+responses and log files; verify no token string
+present
+Page 40 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+16. Implementation Roadmap
+Phase Duration Key Deliverables Phase 0:
+1.5 weeks 1. Dev environment setup (Python 3.11,
+Benchmark &
+PyTorch, rasterio, ffmpeg) 2. RIFE 4.6
+Environment
+tested on 50+ GOES held-out pairs 3. LK
+optical flow baseline implemented 4.
+NASA GIBS WMS client working with
+auth token 5. Decision made: RIFE
+proceed / fine-tune / fallback to LK
+Phase 1: Data
+2 weeks 1. Full WMS client with cache, rate-limit
+&
+queue, auth 2. Preprocessing pipeline
+Preprocessing
+with all FR-PP requirements 3. Gap
+detector and sub-sequence segmenter 4.
+All TC-02, TC-03, TC-10, TC-12 test
+cases pass
+Phase 2:
+2 weeks 1. Interpolation engine with recursive
+Interpolation
+bisection 2. Auto-tiling for large images 3.
+Engine
+Depth limiter against gap-duration table
+4. Fine-tuning of RIFE if Phase 0
+approved it 5. TC-04, TC-07, TC-09 test
+cases pass
+Phase 3:
+1.5 weeks 1. Statistical Plausibility Module with
+Validation &
+adaptive thresholds 2. Confidence
+Confidence
+classifier with all label types 3.
+Conservative merge rule implemented 4.
+TC-05, TC-06, TC-11 test cases pass
+Phase 4:
+1 week 1. Dual MP4+WebM output via FFmpeg
+Video
+2. Gap placeholder frames 3. Watermark
+Generation
+burn-in 4. Metadata JSON sidecar 5. TC-
+08 test case passes
+Phase 5:
+2.5 weeks 1. FastAPI with all endpoints, OpenAPI
+REST API &
+docs 2. Job queue and audit logging 3.
+Frontend
+OpenLayers WebGIS with all FR-WEB
+requirements 4. Comparison view,
+confidence timeline, disclaimer 5. All TC-
+09, TC-13, TC-14 test cases pass 6.
+Integration test suite complete (100 API
+requests)
+Phase 6:
+1.5 weeks 1. Held-out frame test on 5 datasets 2.
+Evaluation
+Evaluation report generated 3. A/B
+usability test with 5–10 participants 4.
+Phase Gate (must
+pass to proceed)
+RIFE PSNR ≥ 28 dB
+OR decision to use LK
+documented. WMS
+client fetches 6-hr
+GOES sequence.
+Pipeline fetches,
+validates, and
+preprocesses 6-hr
+GOES data. All
+preprocessing unit
+tests pass.
+Interpolation PSNR ≥
+28 dB on 10 held-out
+pairs. All interpolation
+unit tests pass.
+Classifier precision ≥
+80% on 50 synthetic
+bad-frame injection
+tests.
+All 4 video files
+generated for test
+dataset. Watermark
+confirmed in video file.
+Memory peak < 4 GB.
+All NFR-07 through
+NFR-12 targets met. All
+14 mandatory test
+cases pass.
+NFR-03 through NFR-
+06 met. Evaluation
+HTML report
+Page 41 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Phase Duration Key Deliverables Phase Gate (must
+pass to proceed)
+Artifact documentation 5. Performance
+generated. A/B test
+benchmarks (CPU + GPU if available)
+conducted.
+Phase 7:
+1 week 1. Dissertation chapter on system design
+All deliverables
+Documentation
+(references this PRD) 2. API
+submitted. Code is
+& Delivery
+documentation finalised 3. Demo video
+runnable from a fresh
+recorded 4. Code review and cleanup 5.
+clone per README
+GitHub repository with README
+instructions.
+✗ CRITICAL: Phase 0 Is an Absolute Gate
+If Phase 0 reveals that RIFE PSNR < 25 dB AND LK optical flow PSNR < 22 dB, the project has a
+fundamental feasibility problem.
+In this scenario: stop; consult supervisor; consider reducing scope to a pure WebGIS pipeline using
+off-the-shelf NWP-interpolated data as the "smooth" source.
+Do not proceed to Phase 1 without a working interpolation approach. Discovering this in Phase 4 is
+catastrophic.
+Page 42 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+17. Risk Register — All Mitigated
+Risk Prob. Impact Mitigation (v2.0 — Fully Resolved) RIFE domain gap: poor
+High Critical Phase 0 benchmark gate
+quality on satellite data
+(mandatory). LK optical flow warping
+as fully-implemented fallback.
+Decision documented in audit log.
+RIFE fine-tuning option available if
+time permits.
+RIFE fails and LK also
+Low Critical If both fail Phase 0, system falls
+fails quality gate
+back to pure WMS animation
+(original frames only); still a working
+system with WebGIS interface.
+NASA GIBS / MOSDAC
+Medium High Local cache of test datasets from
+access issues
+NOAA AWS S3. Static demo archive
+for presentation. Rate-limit queue.
+Auth token integration.
+GPU unavailable in lab Medium Medium CPU path fully implemented and
+tested. Pre-computed results cached
+for demo. Benchmark numbers
+documented.
+MOSDAC API unstable Medium Low MOSDAC is P2 feature. Static
+INSAT archive as fallback. Project
+not blocked by MOSDAC availability.
+Project timeline slips High Medium Phase 0–4 form the minimum viable
+submission. Phases 5–7 reduce to
+minimum UI if time is short. P2
+features dropped first.
+Over-claiming
+Medium Critical Sections 4 (Guardrails), disclaimer in
+capabilities to evaluators
+all outputs (Rule OI-02), clear "IS /
+IS NOT" statement in Section 1.
+Evaluators see limitations first.
+WebGIS performance on
+Medium Medium HLS streaming (FR-VG-05).
+large videos
+Memory-efficient FFmpeg pipe (FR-
+VG-07). Video limited to 6-hr window
+for demo.
+Fine-tuning requires
+Medium Medium Fine-tuning is optional. LK baseline
+more time than
+is always the fallback. Report clearly
+estimated
+documents which model was used.
+Audit log or evaluation
+Low High Audit log is a pipeline output (Rule
+report missing at
+SG-03), not a manual step.
+submission
+Residual
+Risk
+Low —
+fallback
+always
+available
+Low —
+always a
+functional
+output
+Low —
+cached data
+available
+offline
+Low —
+system runs
+on CPU
+Very Low —
+P2 feature
+Medium —
+manage
+scope
+actively
+Low —
+architecture
+enforces
+honesty
+Low —
+mitigated by
+streaming
+Low —
+optional
+component
+Low —
+automated
+outputs
+Page 43 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Risk Prob. Impact Mitigation (v2.0 — Fully Resolved) Residual
+Risk
+Automated evaluation report
+(Section 12). Both tested in TC-13.
+Page 44 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+18. Operational Policies & Governance
+18.1 Scientific Integrity Policies
+POL-SCI-01 — Interpolated Data Is Never Scientific Ground Truth
+No interpolated frame produced by this system may be cited, presented, or used as a scientific
+observation. All interpolated frames are labelled synthetic in all outputs, all metadata, all API
+responses, all UI displays, and all video files. Violation of this policy constitutes academic misconduct.
+POL-SCI-02 — Limitations Must Be Disclosed in All Demonstrations
+Every public demonstration, presentation, or viva defence of this system must explicitly state:
+"Interpolated frames are AI-generated and statistically plausible — they are not observed satellite data
+and do not represent what the atmosphere actually looked like at the interpolated time."
+POL-SCI-03 — No Extrapolation
+The system must never generate a frame temporally outside the bounding pair of observed frames.
+Rule OI-03 is enforced architecturally.
+18.2 Data Governance Policies
+POL-DATA-01 — NASA GIBS Terms of Use
+NASA GIBS data is freely available for use, including in applications, subject to NASA's Open Data
+Policy. The system must credit GIBS in all outputs: "Satellite imagery courtesy NASA GOES-East via
+NASA GIBS."
+POL-DATA-02 — MOSDAC / ISRO Terms
+INSAT data accessed via MOSDAC requires registration and is subject to ISRO's data policy. Verify
+terms at mosdac.gov.in before any public deployment. For academic use within the college, this is
+generally permitted with attribution.
+POL-DATA-03 — Cache Retention
+Downloaded satellite data frames are cached with a 24-hour TTL by default. Cached data must not be
+distributed or used beyond the stated pipeline purpose. Cache must be purgeable via API endpoint
+DELETE /api/v1/cache.
+18.3 Code & Development Policies
+POL-DEV-01 — Version Control
+All code is maintained in a Git repository. No direct commits to main branch. All changes via pull
+request. At least one team member reviews each PR before merge.
+Page 45 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+POL-DEV-02 — Dependency Management
+All Python dependencies pinned in requirements.txt with exact versions. Node.js dependencies pinned
+in package-lock.json. No floating version specifiers (no ">=", only "==") in production dependencies.
+POL-DEV-03 — Model Checkpoint Management
+Model checkpoints are stored outside the Git repository (use Git LFS or a separate S3 bucket).
+Checkpoint SHA-256 hash is recorded in requirements.txt or a model_registry.json file. Any checkpoint
+change requires re-running the Phase 0 benchmark.
+Page 46 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+19. Glossary
+Term Definition
+ABI Advanced Baseline Imager — the primary imaging instrument on GOES-
+16/17/18.
+Adaptive
+Setting confidence thresholds based on the statistical distribution of the
+Thresholding
+current session's original frames, rather than fixed global values.
+Audit Log Per-job JSON file recording all pipeline stages, decisions, parameters, and
+outputs. Mandatory for every job (Rule SG-03).
+Conservative Merge
+When multiple validation metrics assign different confidence labels, the lowest
+Rule
+(most conservative) label is assigned. Prevents false HIGH confidence.
+DAIN Depth-Aware Video Frame Interpolation — permanently excluded from this
+system (requires depth maps unavailable in satellite imagery).
+Domain Gap The difference between the statistical distribution of a model's training data
+(natural video) and its deployment data (satellite imagery). The primary
+technical risk of this project.
+EPE Endpoint Error — the L2 distance between estimated and ground-truth optical
+flow vectors. Used to measure flow field consistency.
+FILM Frame Interpolation for Large Motion — Google Research model; tested as
+secondary candidate if RIFE fails Phase 0.
+GIBS Global Imagery Browse Services — NASA's OGC WMS/WMTS service for
+satellite imagery.
+HLS HTTP Live Streaming — Apple's adaptive bitrate streaming protocol; used for
+progressive video delivery.
+INSAT Indian National Satellite System — ISRO's geostationary satellite series for
+Indian Ocean coverage.
+Intensity
+Metric checking whether the total pixel intensity (proxy for cloud mass) is
+Conservation
+conserved between f1, interpolated frame, and f2. Large deviations indicate
+hallucinated or missing cloud mass.
+LK / Lucas-Kanade Lucas-Kanade optical flow algorithm — used here as the deterministic
+fallback interpolation method (via cv2.calcOpticalFlowFarneback, a dense
+variant).
+Limb Zone Near-edge-of-Earth region in geostationary imagery where parallax and scan
+angle produce geometric distortions. Must be masked in all quality metrics.
+LPIPS Learned Perceptual Image Patch Similarity — deep learning-based perceptual
+image quality metric; correlates better with human judgment than
+PSNR/SSIM.
+MOSDAC Meteorological and Oceanographic Satellite Data Archival Centre —
+ISRO/SAC's data distribution service for INSAT data.
+Page 47 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Term Definition
+NWP Numerical Weather Prediction — physics-based atmospheric modelling. Out
+of scope for this system.
+OGC Open Geospatial Consortium — the standards body for WMS, WMTS, WFS
+and other geospatial protocols.
+Optical Flow Estimation of apparent pixel motion between consecutive frames. Used for
+interpolation (LK) and validation (EPE consistency check).
+PSNR Peak Signal-to-Noise Ratio — image quality metric measured in decibels.
+Higher is better. ≥ 28 dB is the project target.
+Provenance Label One of {OBSERVED, INTERPOLATED_HIGH, INTERPOLATED_MEDIUM,
+INTERPOLATED_LOW, REJECTED, GAP}. Mandatory on every frame (Rule
+OI-01).
+Radiometric
+Per-session scaling of pixel values to [0.0, 1.0] float32 range based on the
+Normalisation
+physical value range of the specific satellite band.
+Recursive Bisection Interpolation strategy: generate the midpoint frame first, then midpoints of
+each half recursively. More stable than sequential generation for large gaps.
+RIFE Real-Time Intermediate Flow Estimation — the primary candidate AI
+interpolation model. Must pass Phase 0 benchmark before use.
+SSIM Structural Similarity Index — perceptual image quality metric in [0,1]. ≥ 0.80 is
+the project target. < 0.60 triggers REJECTED label.
+Statistical Plausibility
+Module 4 of this system. Assesses the visual and statistical plausibility of
+Module
+interpolated frames. Does NOT assess physical correctness.
+Terminator The day-night boundary on Earth's surface. Crossing the terminator within a
+frame pair causes dramatic brightness changes in visible bands.
+tOF Temporal Optical Flow — metric measuring the consistency of motion across
+consecutive output frames relative to the original sequence.
+TTL Time-To-Live — the duration for which a cached item is considered valid
+before re-fetching.
+WMS Web Map Service — OGC standard HTTP protocol for serving georeferenced
+map images.
+Page 48 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Appendix A — REST API Contract
+Endpoint Method Description Success Response POST /api/v1/jobs POST Submit new
+201 {job_id, status:
+pipeline job.
+QUEUED,
+Body: {satellite,
+estimated_duration}
+layer, bbox,
+start_time,
+end_time,
+depth, format}
+GET /api/v1/jobs/{job_id} GET Get job status
+200 {status,
+and results
+progress, video_urls,
+metadata_url, errors}
+DELETE /api/v1/jobs/{job_id} DELETE Cancel running
+200 {cancelled: true} job; clean up
+partial outputs
+GET
+GET Fetch per-frame
+200 [{frame_index,
+/api/v1/jobs/{job_id}/metadata
+metadata JSON
+timestamp, type,
+confidence,
+is_observed}]
+GET /api/v1/jobs/{job_id}/audit GET Fetch job audit
+200 {job_id, stages,
+log JSON
+model_version,
+frames, errors}
+GET
+GET Serve
+200 text/html /api/v1/evaluation/{job_id}/report
+evaluation
+HTML report
+GET /api/v1/cache/status GET Cache
+200 {size_mb,
+statistics: size,
+entry_count,
+entries, TTL
+oldest_entry}
+distribution
+DELETE /api/v1/cache DELETE Purge all
+200 {purged_entries,
+cached frames
+freed_mb}
+and metadata
+GET /api/v1/health GET System health
+200 {status, rife: ok,
+check: all
+ffmpeg: ok,
+modules and
+wms_gibs: ok,
+dependencies
+wms_mosdac:
+ok/degraded}
+GET /api/v1/layers GET List available
+200 [{source,
+WMS layers by
+layer_id, description,
+source with
+bands,
+metadata
+temporal_resolution}]
+Error Codes
+422 (schema
+error), 429
+(rate limited)
+404 (not
+found)
+404, 409
+(already
+complete)
+404
+404
+404 (no
+evaluation
+run)
+—
+—
+503 (critical
+dependency
+down)
+503
+Page 49 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Appendix B — Recommended Test Datasets
+Dataset Source Access Purpose Est.
+Download
+Size
+GOES-16 ABI Full
+NOAA AWS Open
+aws s3 cp s3://noaa-
+Primary test +
+~2 GB per
+Disk — Band 13
+Data
+goes16/ABI-L1b-RadF/
+fine-tuning
+day
+training data
+(NetCDF)
+GOES-16 ABI
+NOAA AWS Open
+aws s3 cp s3://noaa-
+5-min cadence
+~800 MB
+CONUS — Band
+Data
+goes16/ABI-L1b-RadC/
+testing; Phase 0
+per day
+13
+benchmark
+Himawari-8 AHI
+JAXA via AWS aws s3 cp s3://noaa-
+Asia-Pacific
+~1.5 GB
+Full Disk
+himawari8/
+coverage;
+per day
+alternative
+satellite test
+NASA GIBS WMS
+NASA Earthdata
+GIBS WMS TIME
+Direct WMS
+On-
+Archive
+GIBS
+parameter; requires
+integration
+demand
+Earthdata token
+testing; PNG
+(no local
+format
+storage)
+MOSDAC INSAT-
+ISRO MOSDAC
+mosdac.gov.in after
+INSAT
+Variable
+3D
+Portal
+registration
+integration (P2);
+(HDF5
+MOSDAC API
+format)
+test
+Phase 0
+Self-assembled
+aws s3 sync s3://noaa-
+Standardised
+~400 MB
+Benchmark Set
+from GOES-16
+goes16/ABI-L1b-RadC/
+held-out test for
+CONUS
+(select 50 pairs)
+all model
+comparisons
+Page 50 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Appendix C — System Effectiveness Verification
+Checklist
+Every item below must be checked before final submission. Items marked (GATE) are mandatory for
+project completion.
+ID Criterion Category Status
+V-01
+PSNR ≥ 28 dB on held-out test set (5 events) Quality [ ] Pending
+(GATE)
+V-02
+SSIM ≥ 0.80 on held-out test set Quality [ ] Pending
+(GATE)
+V-03
+LPIPS ≤ 0.15 on held-out test set Quality [ ] Pending
+(GATE)
+V-04
+Confidence classifier precision ≥ 80% Reliability [ ] Pending
+(GATE)
+V-05
+All 14 mandatory test cases in TC-01 through
+Testing [ ] Pending
+(GATE)
+TC-14 pass
+V-06
+Disclaimer watermark present in video file
+Integrity [ ] Pending
+(GATE)
+(ffprobe confirmed)
+V-07
+No API credentials appear in any log, response,
+Security [ ] Pending
+(GATE)
+or config file
+V-08
+Audit log generated for every pipeline job; all
+Governance [ ] Pending
+(GATE)
+fields present
+V-09 A/B usability test: ≥ 70% prefer interpolated
+Usability [ ] Pending
+animation for clarity (≥ 5 participants)
+V-10 Pipeline handles all 6 data ingestion edge
+Robustness [ ] Pending
+cases in Section 13.1 without crash
+V-11 Pipeline handles all 10 preprocessing edge
+Robustness [ ] Pending
+cases in Section 13.2 without crash
+V-12 Pipeline handles all 10 interpolation edge cases
+Robustness [ ] Pending
+in Section 13.3 without crash
+V-13 Side-by-side comparison view stays in sync (<
+Frontend [ ] Pending
+1 frame drift over 60 sec playback)
+V-14 Full pipeline runs end-to-end on 3 different
+Integration [ ] Pending
+datasets without crash
+V-15 pytest-cov report shows ≥ 80% line coverage on
+Testing [ ] Pending
+all pipeline modules
+Page 51 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+ID Criterion Category Status
+V-16 System runs on CPU-only machine; timing
+Performance [ ] Pending
+documented
+V-17 Evaluation HTML report generated and
+Academic [ ] Pending
+reviewed by at least one faculty member
+V-18 Phase 0 benchmark results documented in
+Academic [ ] Pending
+dissertation
+V-19 LK optical flow baseline results included in
+Academic [ ] Pending
+evaluation comparison
+V-20 All Appendix A API endpoints return correct
+API [ ] Pending
+status codes and bodies
+Page 52 of 53
+AI-Based Temporal Enhancement & WebGIS Visualization System | PRD v2.0
+Appendix D — Dependency Manifest
+Package Version
+Purpose Install Command
+(min)
+Python 3.11+ Runtime —
+torch 2.1.0 RIFE inference engine pip install torch torchvision
+rasterio 1.3.9 GeoTIFF/HDF5 reading,
+pip install rasterio
+reprojection
+numpy 1.26 Array operations throughout
+pip install numpy
+pipeline
+opencv-python 4.9 Optical flow, image processing pip install opencv-python
+scikit-image 0.22 SSIM, PSNR computation pip install scikit-image
+lpips 0.1.4 Perceptual quality metric pip install lpips
+aiohttp 3.9 Async WMS HTTP client pip install aiohttp
+OWSLib 0.29 WMS GetCapabilities parsing pip install OWSLib
+fastapi 0.111 REST API framework pip install fastapi
+uvicorn 0.29 ASGI server for FastAPI pip install uvicorn
+pydantic 2.7 Input validation and schema pip install pydantic
+ffmpeg-python 0.2.0 FFmpeg Python wrapper pip install ffmpeg-python
+satpy 0.47 Himawari HSD format reader pip install satpy
+xarray 2024.3 NetCDF reading for GOES L1b pip install xarray netcdf4
+detect-secrets 1.4 Pre-commit credential scanning pip install detect-secrets
+pytest 8.1 Test runner pip install pytest
+pytest-cov 5.0 Coverage reporting pip install pytest-cov
+pytest-asyncio 0.23 Async test support pip install pytest-asyncio
+httpx 0.27 Async HTTP client for API tests pip install httpx
+memory-profiler 0.61 RAM profiling pip install memory-profiler
+FFmpeg 6.0+ Video encoding (system binary) apt install ffmpeg (or brew
+install ffmpeg)
+AI-Based Temporal Enhancement & WebGIS Visualization System — PRD v2.0 | Production Specification
+This document supersedes PRD v1.0. All v1.0 warnings and caveats are resolved herein.
+Page 53 of 53

@@ -47,6 +47,8 @@ NUM_INTERP = 3
 BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
 RAW_DIR   = os.path.join(BASE_DIR, "data", "raw_frames")
 INTERP_DIR = os.path.join(BASE_DIR, "data", "interpolated_frames")
+CLEAN_DIR = os.path.join(BASE_DIR, "data", "clean_frames")
+GAP_MASK_DIR = os.path.join(BASE_DIR, "data", "sensor_gap_masks")
 
 
 # ------------------------------------------------------------------
@@ -150,6 +152,7 @@ def mask_nodata(img_bgr: np.ndarray,
 # ------------------------------------------------------------------
 def run_interpolation(frame_paths: list) -> list:
     sys.path.insert(0, BASE_DIR)
+    from app.services.confidence import MAX_INTERPOLATION_GAP_MINUTES, gap_minutes_between, recommended_interpolation_frames
     from app.services.interpolation import generate_intermediate_frames
 
     all_generated = []
@@ -158,18 +161,50 @@ def run_interpolation(frame_paths: list) -> list:
         b1 = os.path.splitext(os.path.basename(f1))[0]
         b2 = os.path.splitext(os.path.basename(f2))[0]
         prefix = f"interp_{b1}_{b2}"
+        gap_minutes = gap_minutes_between(DATES[i], DATES[i + 1])
 
         print(f"\n  Interpolating: {os.path.basename(f1)} → {os.path.basename(f2)}")
+        if gap_minutes is not None and gap_minutes > MAX_INTERPOLATION_GAP_MINUTES:
+            print(f"    Skipped: gap is {gap_minutes:.1f} minutes, above PRD hard limit")
+            continue
+
         generated = generate_intermediate_frames(
-            f1, f2, INTERP_DIR,
-            num_frames=NUM_INTERP,
-            file_prefix=prefix
+            f1,
+            f2,
+            INTERP_DIR,
+            num_frames=min(NUM_INTERP, recommended_interpolation_frames(gap_minutes)),
+            file_prefix=prefix,
         )
-        for g in generated:
-            kb = os.path.getsize(g) / 1024
-            print(f"    Generated: {os.path.basename(g)} ({kb:.0f} KB)")
-        all_generated.extend(generated)
+        for record in generated:
+            kb = os.path.getsize(record["path"]) / 1024
+            print(
+                f"    Generated: {os.path.basename(record['path'])} "
+                f"(ratio={record['ratio']:.2f}, {kb:.0f} KB)"
+            )
+        all_generated.extend(record["path"] for record in generated)
     return all_generated
+
+
+def generate_clean_visualization_assets(frame_paths: list) -> None:
+    """Create clean observed-frame products and sensor gap masks for the UI."""
+    sys.path.insert(0, BASE_DIR)
+    from app.services.visualization import prepare_visualization_assets
+
+    raw_frames = []
+    for index, path in enumerate(frame_paths):
+        raw_frames.append({
+            "path": path,
+            "timestamp": DATES[index] if index < len(DATES) else os.path.splitext(os.path.basename(path))[0],
+        })
+
+    assets = prepare_visualization_assets(raw_frames, CLEAN_DIR, GAP_MASK_DIR)
+    for path, asset in assets.items():
+        print(
+            f"    Clean asset: {os.path.basename(asset['cleanPath'])} | "
+            f"gap_mask: {os.path.basename(asset['gapMaskPath'])} | "
+            f"gap_pct={asset['gapCoveragePct']:.2f}% | "
+            f"method={asset['gapFillMethod']}"
+        )
 
 
 # ------------------------------------------------------------------
@@ -178,6 +213,8 @@ def run_interpolation(frame_paths: list) -> list:
 def main():
     os.makedirs(RAW_DIR,   exist_ok=True)
     os.makedirs(INTERP_DIR, exist_ok=True)
+    os.makedirs(CLEAN_DIR, exist_ok=True)
+    os.makedirs(GAP_MASK_DIR, exist_ok=True)
 
     print("=" * 60)
     print("  WMS Satellite Data Fetcher (EPSG:3857)")
@@ -189,7 +226,7 @@ def main():
     print()
 
     # Clean stale frames
-    for d in [RAW_DIR, INTERP_DIR]:
+    for d in [RAW_DIR, INTERP_DIR, CLEAN_DIR, GAP_MASK_DIR]:
         for f in os.listdir(d):
             if f.lower().endswith(('.png', '.jpg')):
                 os.remove(os.path.join(d, f))
@@ -209,6 +246,9 @@ def main():
     if len(frame_paths) < 2:
         print("  Need ≥2 frames. Aborting.")
         sys.exit(1)
+
+    print("\n  Preparing clean observed-frame visualization assets...")
+    generate_clean_visualization_assets(frame_paths)
 
     # Interpolate
     print()

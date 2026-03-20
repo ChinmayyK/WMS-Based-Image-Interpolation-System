@@ -1,9 +1,11 @@
 const LegendPanel = () => {
   const items = [
-    { color: "bg-primary", label: "Acquisition Frame", desc: "Native WMS Sensor Data" },
-    { color: "bg-confidence-high", label: "High Confidence", desc: "> 90% Structural Similarity" },
-    { color: "bg-confidence-medium", label: "Nominal Confidence", desc: "70-90% Similarity" },
-    { color: "bg-confidence-low", label: "Low Confidence", desc: "< 70% Stability" },
+    { color: "bg-observed", label: "Observed", desc: "Direct sensor observation" },
+    { color: "bg-confidence-high", label: "High", desc: "Adaptive confidence >= 0.85" },
+    { color: "bg-confidence-medium", label: "Medium", desc: "Adaptive confidence >= 0.65" },
+    { color: "bg-confidence-low", label: "Low", desc: "Adaptive confidence >= 0.45" },
+    { color: "bg-gap", label: "Rejected", desc: "Rejected output rendered as placeholder" },
+    { color: "bg-gap", label: "Gap", desc: "GAP — No Data" },
   ];
 
   return (

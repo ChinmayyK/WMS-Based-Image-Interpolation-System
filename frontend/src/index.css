@@ -43,9 +43,11 @@
     --panel: 220 15% 6% / 0.9;
     
     /* Health/Confidence States */
-    --confidence-high: 142 70% 45%;
-    --confidence-medium: 48 96% 50%;
-    --confidence-low: 0 84% 60%;
+    --observed: 123 46% 33%;
+    --confidence-high: 84 81% 44%;
+    --confidence-medium: 30 91% 52%;
+    --confidence-low: 0 72% 51%;
+    --gap: 0 0% 46%;
   }
 }
 

@@ -69,18 +69,20 @@ def test_interpolate_dimensions_match(test_frames):
 
 
 def test_generate_intermediate_frames(test_frames):
-    """Test that generate_intermediate_frames produces correct number of frames."""
-    from app.services.interpolation import generate_intermediate_frames
+    """Test that recursive bisection produces the requested number of frames."""
+    from app.services.interpolation import generate_intermediate_frames, interpolator
 
     f1, f2, tmpdir = test_frames
     out_dir = os.path.join(tmpdir, "interp_out")
     
-    paths = generate_intermediate_frames(f1, f2, out_dir, num_frames=3, file_prefix="test")
+    records = generate_intermediate_frames(f1, f2, out_dir, num_frames=3, file_prefix="test")
     
-    assert len(paths) == 3
-    for p in paths:
-        assert os.path.exists(p)
-        img = cv2.imread(p)
+    assert len(records) == 3
+    assert [record["ratio"] for record in records] == [0.25, 0.5, 0.75]
+    assert interpolator.last_batch["strategy"] == "recursive_bisection"
+    for record in records:
+        assert os.path.exists(record["path"])
+        img = cv2.imread(record["path"])
         assert img is not None
 
 
@@ -119,3 +121,16 @@ def test_interpolate_with_alpha(tmpdir):
     img_out = cv2.imread(out, cv2.IMREAD_UNCHANGED)
     assert img_out is not None
     assert img_out.shape[2] == 4  # Should preserve alpha channel
+    # Complementary coverage should remain opaque in the stitched output.
+    assert np.all(img_out[:, :, 3] == 255)
+
+
+def test_interpolator_exposes_runtime_diagnostics():
+    """The service should report concrete model/fallback diagnostics."""
+    from app.services.interpolation import interpolator
+
+    diagnostics = interpolator.get_diagnostics()
+
+    assert diagnostics["model"]["name"] == "RIFE HDv3"
+    assert diagnostics["model"]["framework"].startswith("PyTorch")
+    assert diagnostics["execution"]["fallbackBehavior"] == "OpenCV alpha blend when weights are missing or model load fails"

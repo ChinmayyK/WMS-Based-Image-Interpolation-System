@@ -1,4 +1,5 @@
 import { SatelliteFrame } from "@/lib/types";
+import { CATEGORY_STYLES, getTimelineCategory } from "@/lib/frame-status";
 
 interface TimelineSliderProps {
   frames: SatelliteFrame[];
@@ -15,12 +16,12 @@ const TimelineSlider = ({ frames, currentIndex, onIndexChange }: TimelineSliderP
         <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Temporal Analysis Timeline</span>
         <div className="flex gap-4">
           <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-green-500/50" />
-            <span className="text-[10px] font-mono text-muted-foreground">SENSOR</span>
+            <div className="w-2 h-2 rounded-full bg-observed/80" />
+            <span className="text-[10px] font-mono text-muted-foreground">OBSERVED</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-blue-500/50" />
-            <span className="text-[10px] font-mono text-muted-foreground">AI PREDICTED</span>
+            <div className="w-2 h-2 rounded-full bg-confidence-high/80" />
+            <span className="text-[10px] font-mono text-muted-foreground">AI LABELLED</span>
           </div>
         </div>
       </div>
@@ -28,14 +29,16 @@ const TimelineSlider = ({ frames, currentIndex, onIndexChange }: TimelineSliderP
       <div className="relative h-12 flex items-center group">
         {/* Progress Track Background */}
         <div className="absolute w-full h-1 bg-white/5 rounded-full overflow-hidden flex">
-          {frames.map((frame, i) => (
+          {frames.map((frame, i) => {
+            const category = getTimelineCategory(frame);
+            const style = CATEGORY_STYLES[category];
+            return (
             <div 
               key={`${frame.timestamp}-${i}`}
-              className={`h-full transition-colors flex-1 ${
-                frame.isOriginal ? 'bg-green-500/20' : 'bg-blue-500/30'
-              }`}
+              className={`h-full transition-colors flex-1 ${style.bg}`}
             />
-          ))}
+            );
+          })}
         </div>
 
         {/* Highlighted Visual Ticks */}
@@ -64,7 +67,7 @@ const TimelineSlider = ({ frames, currentIndex, onIndexChange }: TimelineSliderP
         <div 
           className="absolute top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-200"
           style={{ 
-            left: `calc(${(currentIndex / (totalFrames - 1)) * 100}%)`,
+            left: `calc(${(totalFrames > 1 ? (currentIndex / (totalFrames - 1)) * 100 : 0)}%)`,
             transform: `translate(-50%, -50%)`
           }}
         >

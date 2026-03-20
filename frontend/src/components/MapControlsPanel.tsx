@@ -2,6 +2,8 @@ interface MapControlsPanelProps {
   onResetView: () => void;
   showOverlay: boolean;
   onToggleOverlay: () => void;
+  showRawSensorGaps: boolean;
+  onToggleRawSensorGaps: () => void;
   showConfidence: boolean;
   onToggleConfidence: () => void;
   showClouds: boolean;
@@ -14,6 +16,8 @@ const MapControlsPanel = ({
   onResetView,
   showOverlay,
   onToggleOverlay,
+  showRawSensorGaps,
+  onToggleRawSensorGaps,
   showConfidence,
   onToggleConfidence,
   showClouds,
@@ -45,6 +49,13 @@ const MapControlsPanel = ({
             checked={showOverlay} 
             onChange={onToggleOverlay} 
             color="primary" 
+          />
+          <LayerToggle
+            label="Show Sensor Gaps"
+            description="Scientific raw NoData wedges"
+            checked={showRawSensorGaps}
+            onChange={onToggleRawSensorGaps}
+            color="gap"
           />
           <LayerToggle 
             label="Confidence Matrix" 
@@ -85,7 +96,7 @@ interface LayerToggleProps {
   description: string;
   checked: boolean;
   onChange: () => void;
-  color: 'primary' | 'yellow' | 'blue';
+  color: 'primary' | 'yellow' | 'blue' | 'gap';
 }
 
 const LayerToggle = ({ label, description, checked, onChange, color }: LayerToggleProps) => {
@@ -93,6 +104,7 @@ const LayerToggle = ({ label, description, checked, onChange, color }: LayerTogg
     primary: 'bg-primary shadow-[0_0_8px_rgba(34,211,238,0.4)]',
     yellow: 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]',
     blue: 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]',
+    gap: 'bg-gap shadow-[0_0_8px_rgba(117,117,117,0.4)]',
   };
 
   return (

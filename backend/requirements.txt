@@ -7,6 +7,7 @@ pydantic
 requests
 pytest
 responses
+httpx
 # owslib
 # rasterio
 # gdal
@@ -18,3 +19,4 @@ torch
 torchvision
 gdown
 scikit-image
+imageio-ffmpeg

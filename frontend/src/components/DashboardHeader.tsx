@@ -3,9 +3,16 @@ import { DataSource } from "@/lib/types";
 interface DashboardHeaderProps {
   dataSource: DataSource;
   onToggleDataSource: () => void;
+  showRawSensorGaps: boolean;
+  runtimeSummary: string;
 }
 
-const DashboardHeader = ({ dataSource, onToggleDataSource }: DashboardHeaderProps) => {
+const DashboardHeader = ({
+  dataSource,
+  onToggleDataSource,
+  showRawSensorGaps,
+  runtimeSummary,
+}: DashboardHeaderProps) => {
   return (
     <header className="flex items-center justify-between px-6 py-2 border-b border-border/50 bg-background/95 backdrop-blur z-50">
       <div className="flex items-center gap-4">
@@ -35,12 +42,12 @@ const DashboardHeader = ({ dataSource, onToggleDataSource }: DashboardHeaderProp
         </button>
         
         <div className="flex items-center gap-2 pl-4 border-l border-border/50">
-          <span>SYS. REV 2.4</span>
+          <span>{showRawSensorGaps ? "RAW GAP MODE" : "CLEAN MODE"}</span>
         </div>
         
-        <div className="flex items-center gap-2 text-confidence-high">
-          <span className="w-1.5 h-1.5 rounded-full bg-confidence-high opacity-80" />
-          <span>Telemtry Nominal</span>
+        <div className="flex items-center gap-2 text-foreground/80">
+          <span className={`w-1.5 h-1.5 rounded-full opacity-80 ${runtimeSummary.includes("Fallback") ? "bg-gap" : runtimeSummary.includes("CPU") ? "bg-confidence-medium" : "bg-confidence-high"}`} />
+          <span>{runtimeSummary}</span>
         </div>
       </div>
     </header>
