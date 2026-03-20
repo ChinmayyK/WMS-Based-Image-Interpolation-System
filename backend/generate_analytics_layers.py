@@ -66,10 +66,10 @@ def create_cloud_png(width, height, phase):
 
 
 def create_motion_vectors(phase):
-    """Generate mock GeoJSON motion vectors showing optical flow across India bounds."""
-    # Bounding box roughly covering India (EPSG:4326)
-    MIN_LON, MIN_LAT = 71.0, 15.0
-    MAX_LON, MAX_LAT = 82.0, 25.0
+    """Generate mock GeoJSON motion vectors across the default GOES-East demo region."""
+    # Bounding box over the Gulf of Mexico / western Atlantic (EPSG:4326)
+    MIN_LON, MIN_LAT = -95.0, 12.0
+    MAX_LON, MAX_LAT = -60.0, 40.0
     
     features = []
     

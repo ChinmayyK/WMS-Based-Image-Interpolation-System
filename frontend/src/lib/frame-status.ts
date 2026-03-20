@@ -96,7 +96,7 @@ export function getRuntimeSummary(runtimeDiagnostics?: RuntimeDiagnostics | null
     return "Runtime diagnostics are available in API mode.";
   }
   if (execution.fallbackActive) {
-    return "Fallback interpolation active (OpenCV)";
+    return "Optical-flow fallback active";
   }
   const device = runtimeDiagnostics?.interpolation?.model.device;
   if (device === "mps") {

@@ -44,8 +44,8 @@
     
     /* Health/Confidence States */
     --observed: 123 46% 33%;
-    --confidence-high: 84 81% 44%;
-    --confidence-medium: 30 91% 52%;
+    --confidence-high: 174 100% 27%; /* Teal/Green */
+    --confidence-medium: 28 91% 53%; /* Amber #F57F17 */
     --confidence-low: 0 72% 51%;
     --gap: 0 0% 46%;
   }

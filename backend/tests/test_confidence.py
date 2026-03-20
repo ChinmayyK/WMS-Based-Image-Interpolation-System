@@ -9,8 +9,10 @@ from app.main import app
 from app.services.confidence import (
     build_session_confidence_profile,
     gap_minutes_between,
+    provenance_label_for,
     recommended_interpolation_frames,
     score_generated_frame,
+    score_generated_sequence,
 )
 
 
@@ -49,7 +51,40 @@ def test_score_generated_frame_uses_session_profile(tmpdir):
     assert 0.0 <= score["confidence"] <= 1.0
     assert score["confidenceLabel"] in {"HIGH", "MEDIUM", "LOW", "REJECTED"}
     assert "avgSSIM" in score["metrics"]
-    assert "avgMAD" in score["metrics"]
+    assert "sequentialMAD" in score["metrics"]
+    assert score["provenanceLabel"] == provenance_label_for(score["confidenceLabel"])
+
+
+def test_sequence_scoring_applies_domain_caps(tmpdir):
+    frame0 = os.path.join(tmpdir, "frame0.png")
+    frame1 = os.path.join(tmpdir, "frame1.png")
+    frame_mid = os.path.join(tmpdir, "frame_mid.png")
+
+    _write_frame(frame0, (20, 80, 120))
+    _write_frame(frame_mid, (24, 84, 124))
+    _write_frame(frame1, (28, 88, 128))
+
+    profile = build_session_confidence_profile([
+        {"timestamp": "2024-06-01 10:00", "path": frame0},
+        {"timestamp": "2024-06-01 10:10", "path": frame_mid},
+        {"timestamp": "2024-06-01 10:20", "path": frame1},
+        {"timestamp": "2024-06-01 10:30", "path": frame_mid},
+        {"timestamp": "2024-06-01 10:40", "path": frame1},
+    ])
+
+    scores = score_generated_sequence(
+        [{"path": frame_mid, "ratio": 0.5}],
+        frame0,
+        frame1,
+        10,
+        profile,
+        source_frame0={"path": frame0, "flags": ["TERMINATOR"]},
+        source_frame1={"path": frame1, "flags": []},
+    )
+
+    assert len(scores) == 1
+    assert scores[0]["confidenceLabel"] in {"MEDIUM", "LOW", "REJECTED"}
+    assert "TERMINATOR" in scores[0]["metrics"]["domainFlags"]
 
 
 def test_interpolation_route_blocks_large_gap(monkeypatch):

@@ -3,9 +3,14 @@ export interface SatelliteFrame {
   imageUrl: string;
   rawImageUrl?: string | null;
   cleanImageUrl?: string | null;
+  type?: "OBSERVED" | "INTERPOLATED" | "GAP";
+  source?: string | null;
   cloudMaskUrl?: string;
   vectorsUrl?: string;
   gapMaskUrl?: string | null;
+  nodataMaskUrl?: string | null;
+  limbMaskUrl?: string | null;
+  terminatorMaskUrl?: string | null;
   hasSensorGap?: boolean;
   gapCoveragePct?: number;
   gapFillMethod?: string | null;
@@ -29,10 +34,27 @@ export interface SatelliteFrame {
   placeholderReason?: string | null;
   modelInfo?: {
     name?: string;
+    version?: string;
     framework?: string;
     weightsFile?: string;
     weightsSizeMB?: number | null;
     device?: string | null;
+    benchmarkCompliant?: boolean;
+    deviationNote?: string | null;
+  };
+  fallbackUsed?: boolean;
+  fallbackMethod?: string | null;
+  inferenceTimeMs?: number | null;
+  motionInfo?: {
+    available?: boolean;
+    method?: string;
+    meanMagnitudePx?: number;
+    maxMagnitudePx?: number;
+    p95MagnitudePx?: number;
+  };
+  audit?: {
+    jobId?: string;
+    logUrl?: string;
   };
   bbox?: [number, number, number, number];
   /**
@@ -41,21 +63,19 @@ export interface SatelliteFrame {
    */
   extent3857?: [number, number, number, number];
   /**
-   * WMS DATE string (YYYY-MM-DD) for sensor (original) frames.
-   * When present, MapViewer can use live TileWMS against NASA GIBS for
-   * scientifically raw observed imagery.
+   * Full WMS TIME value used for the observed GOES frame.
    */
-  wmsDate?: string;
+  wmsTime?: string;
   /**
-   * WMS layer name override (defaults to MODIS_Terra_CorrectedReflectance_TrueColor).
+   * WMS layer name override for the observed GOES frame.
    */
   wmsLayer?: string;
   /**
-   * Fully qualified WMS GetMap base URL used for live sensor rendering.
+   * Fully qualified WMS GetMap base URL used for GOES retrieval.
    */
   wmsUrl?: string;
   /**
-   * CRS used for the live WMS source.
+   * CRS used for the GOES WMS source.
    */
   wmsCrs?: string;
 }
@@ -69,6 +89,8 @@ export type DataSource = "demo" | "api";
 export type ConfidenceCategory = "OBSERVED" | "HIGH" | "MEDIUM" | "LOW" | "REJECTED" | "GAP";
 
 export interface WmsRequestDiagnostics {
+  requestType?: string;
+  attempt?: number;
   time: string;
   endpoint: string;
   requestedUrl: string;
@@ -89,14 +111,57 @@ export interface RuntimeDiagnostics {
     frameCount: number;
     rawFramesDir: string;
     interpolatedFramesDir: string;
-    cleanFramesDir?: string;
-    sensorGapMasksDir?: string;
     gapPlaceholdersDir?: string;
     source: string;
+    sessionMetadataPath?: string;
+    interpolationLogPath?: string;
   };
+  session?: {
+    sessionId: string;
+    source: string;
+    layer: string;
+    title?: string;
+    bbox: number[];
+    extent3857?: number[];
+    crs: string;
+    wmsUrl: string;
+    requestedStartTime: string;
+    requestedEndTime: string;
+    availableStartTime?: string;
+    availableEndTime?: string;
+    availableFrameCount: number;
+    downloadedFrameCount: number;
+    failedFrameCount: number;
+    failedTimestamps: Array<{
+      timestamp: string;
+      wmsTime: string;
+      error: string;
+    }>;
+    cadenceMinutes: {
+      minGapMinutes?: number | null;
+      medianGapMinutes?: number | null;
+      maxGapMinutes?: number | null;
+    };
+    validation?: {
+      continuousFrames?: boolean;
+      observedFrameCount?: number;
+      failedFrameCount?: number;
+      minGapMinutes?: number | null;
+      medianGapMinutes?: number | null;
+      maxGapMinutes?: number | null;
+    };
+    metadataUrl?: string;
+  } | null;
   wms?: {
     defaultEndpoints: Record<string, string>;
     overrideEndpoint: string | null;
+    defaultLayer?: string;
+    lastCapabilitiesFetch?: {
+      endpoint: string;
+      requestedUrl: string;
+      fetchedAt: string;
+      layerCount: number;
+    } | null;
     lastRequests: WmsRequestDiagnostics[];
   };
   confidence?: {
@@ -119,22 +184,32 @@ export interface RuntimeDiagnostics {
   interpolation?: {
     model: {
       name: string;
+      version?: string;
+      preferredModel?: string;
+      benchmarkCompliant?: boolean;
+      deviationNote?: string | null;
       framework: string;
       weightsFile: string;
       weightsPath: string;
       weightsSizeBytes: number | null;
       weightsSizeMB: number | null;
+      weightsSha256?: string | null;
+      expectedWeightsSha256?: string | null;
+      integrityVerified?: boolean;
       loaded: boolean;
+      startupValidated?: boolean;
       loadedAt: string | null;
       device: string | null;
       cudaAvailable: boolean;
       mpsAvailable: boolean;
       loadError: string | null;
+      startupErrors?: string[];
     };
     execution: {
       activeMode: string;
       fallbackActive?: boolean;
       fallbackBehavior: string;
+      fallbackMethod?: string;
       performanceExplanation?: string;
       lastRun?: {
         startedAt: string;
@@ -149,9 +224,13 @@ export interface RuntimeDiagnostics {
         outputShape: number[];
         opaqueCoveragePct: number;
         usedModelWeights: boolean;
+        fallbackUsed?: boolean;
+        fallbackMethod?: string | null;
+        suspiciousRuntime?: boolean;
         performanceExplanation?: string;
       } | null;
       lastBatch?: {
+        jobId?: string;
         startedAt: string;
         completedAt: string;
         requestedFrames: number;
@@ -160,8 +239,14 @@ export interface RuntimeDiagnostics {
         strategy?: string;
         ratios?: number[];
         frameDurationsMs?: number[];
+        totalInferenceTimeMs?: number;
+        wallTimeMs?: number;
         executionMode: string;
+        fallbackUsed?: boolean;
+        fallbackMethod?: string | null;
+        recursionDepth?: number;
         outputs: string[];
+        auditLogUrl?: string;
         performanceExplanation?: string;
       } | null;
     };
@@ -177,21 +262,97 @@ export interface RuntimeDiagnostics {
     metadataUrl: string;
   } | null;
   evaluation?: {
+    version: string;
     generatedAt: string;
     datasetCount: number;
+    sampleCount: number;
     results: Array<{
+      jobId: string;
       name: string;
       type: string;
+      regime: string;
       inputFrames: string[];
       targetFrame: string;
       psnr: number;
       ssim: number;
       lpips?: number | null;
+      tof: number;
+      baseline: string;
+      baselineMetrics: {
+        psnr: number;
+        ssim: number;
+        lpips?: number | null;
+        tof: number;
+      };
+      comparison: {
+        psnrDelta: number;
+        ssimDelta: number;
+        lpipsDelta?: number | null;
+        tofDelta: number;
+        winner: string;
+      };
     }>;
     averages: {
       psnr: number;
       ssim: number;
       lpips?: number | null;
+      tof: number;
+    };
+    baselineAverages: {
+      psnr: number;
+      ssim: number;
+      lpips?: number | null;
+      tof: number;
+    };
+    thresholds: {
+      psnr: number;
+      ssim: number;
+    };
+    targetValidation: {
+      meetsPSNR: boolean;
+      meetsSSIM: boolean;
+      meetsAll: boolean;
+      warning?: string | null;
+    };
+    confidenceValidation: {
+      confidence_accuracy: number;
+      overall_label_accuracy?: number;
+      rejection_rate: number;
+      misclassification: number;
+    };
+    confidenceCalibration?: {
+      expectedCalibrationError: number;
+      bins: Array<{
+        range: [number, number];
+        count: number;
+        meanScore?: number | null;
+        observedAccuracy?: number | null;
+      }>;
+    };
+    distributions?: Record<string, {
+      mean: number;
+      median: number;
+      std: number;
+      min: number;
+      max: number;
+    } | null>;
+    baselineDistributions?: Record<string, {
+      mean: number;
+      median: number;
+      std: number;
+      min: number;
+      max: number;
+    } | null>;
+    qualificationGate?: {
+      sampleCount?: number;
+      passed: boolean;
+      productionAllowed: boolean;
+      fallbackMode?: string | null;
+      checks: Record<string, boolean>;
+    };
+    reportPaths: {
+      jsonUrl: string;
+      htmlUrl: string;
     };
   } | null;
 }

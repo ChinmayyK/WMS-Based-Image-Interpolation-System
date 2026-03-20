@@ -59,6 +59,7 @@ const FrameInfoPanel = ({
   const modelDiagnostics = runtimeDiagnostics?.interpolation?.model;
   const executionDiagnostics = runtimeDiagnostics?.interpolation?.execution;
   const confidenceProfile = runtimeDiagnostics?.confidence;
+  const sessionDiagnostics = runtimeDiagnostics?.session;
   const latestWmsRequest = runtimeDiagnostics?.wms?.lastRequests?.length
     ? runtimeDiagnostics.wms.lastRequests[runtimeDiagnostics.wms.lastRequests.length - 1]
     : null;
@@ -74,7 +75,7 @@ const FrameInfoPanel = ({
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.6)]" />
           <h2 className="text-[11px] font-bold font-mono text-primary tracking-[0.2em] uppercase">
-            Transparency Panel
+            Confidence & Diagnostics
           </h2>
         </div>
       </div>
@@ -135,17 +136,37 @@ const FrameInfoPanel = ({
             {modelDiagnostics ? (
               <>
                 <AnalyticsRow label="Model" value={modelDiagnostics.name} />
+                {modelDiagnostics.version && <AnalyticsRow label="Version" value={modelDiagnostics.version} />}
+                {modelDiagnostics.preferredModel && <AnalyticsRow label="PRD Benchmark" value={modelDiagnostics.preferredModel} />}
                 <AnalyticsRow label="Framework" value={modelDiagnostics.framework} />
                 <AnalyticsRow
                   label="Weights"
                   value={`${modelDiagnostics.weightsFile} (${modelDiagnostics.weightsSizeMB?.toFixed(2) ?? "?"} MB)`}
                 />
+                {modelDiagnostics.weightsSha256 && (
+                  <AnalyticsRow label="Weights SHA256" value={modelDiagnostics.weightsSha256} />
+                )}
                 <AnalyticsRow label="Device" value={modelDiagnostics.device ?? "Unavailable"} />
                 <AnalyticsRow
+                  label="Benchmark Status"
+                  value={modelDiagnostics.benchmarkCompliant ? "Benchmark model" : "Non-benchmark model"}
+                  highlight={!modelDiagnostics.benchmarkCompliant}
+                />
+                {modelDiagnostics.integrityVerified != null && (
+                  <AnalyticsRow
+                    label="Integrity"
+                    value={modelDiagnostics.integrityVerified ? "SHA256 verified" : "Integrity check failed"}
+                    highlight={!modelDiagnostics.integrityVerified}
+                  />
+                )}
+                <AnalyticsRow
                   label="Execution"
-                  value={executionDiagnostics?.fallbackActive ? "Fallback interpolation active (OpenCV)" : "Neural inference active"}
+                  value={executionDiagnostics?.fallbackActive ? "Fallback interpolation active (Optical flow)" : "Neural inference active"}
                   highlight={Boolean(executionDiagnostics?.fallbackActive)}
                 />
+                {executionDiagnostics?.fallbackMethod && executionDiagnostics?.fallbackActive && (
+                  <AnalyticsRow label="Fallback Method" value={executionDiagnostics.fallbackMethod} highlight />
+                )}
                 {executionDiagnostics?.lastRun && (
                   <AnalyticsRow label="Last Inference" value={`${executionDiagnostics.lastRun.durationMs.toFixed(2)} ms`} />
                 )}
@@ -153,7 +174,21 @@ const FrameInfoPanel = ({
                   <>
                     <AnalyticsRow label="Frames Generated" value={`${executionDiagnostics.lastBatch.generatedFrames}`} />
                     <AnalyticsRow label="Strategy" value={executionDiagnostics.lastBatch.strategy ?? "recursive_bisection"} />
+                    {executionDiagnostics.lastBatch.recursionDepth != null && (
+                      <AnalyticsRow label="Recursion Depth" value={`${executionDiagnostics.lastBatch.recursionDepth}`} />
+                    )}
+                    {executionDiagnostics.lastBatch.totalInferenceTimeMs != null && (
+                      <AnalyticsRow
+                        label="Batch Inference"
+                        value={`${executionDiagnostics.lastBatch.totalInferenceTimeMs.toFixed(2)} ms`}
+                      />
+                    )}
                   </>
+                )}
+                {modelDiagnostics.deviationNote && (
+                  <p className="text-[10px] font-mono text-muted-foreground leading-relaxed">
+                    {modelDiagnostics.deviationNote}
+                  </p>
                 )}
                 {executionDiagnostics?.performanceExplanation && (
                   <p className="text-[10px] font-mono text-muted-foreground leading-relaxed">
@@ -170,16 +205,42 @@ const FrameInfoPanel = ({
 
           <div className="pt-4 border-t border-white/5 space-y-4">
             <AnalyticsRow label="WMS Summary" value={getWmsSummary(runtimeDiagnostics)} />
-            <AnalyticsRow label="WMS Source" value={NASA_SOURCE_LABEL} />
+            <AnalyticsRow label="WMS Source" value={frame.source ?? sessionDiagnostics?.source ?? NASA_SOURCE_LABEL} />
             <AnalyticsRow label="Endpoint" value={frame.wmsUrl ?? latestWmsRequest?.endpoint ?? "Unavailable"} />
-            <AnalyticsRow label="Layer" value={frame.wmsLayer ?? "MODIS_Terra_CorrectedReflectance_TrueColor"} />
+            <AnalyticsRow label="Layer" value={frame.wmsLayer ?? sessionDiagnostics?.layer ?? "Unavailable"} />
             <AnalyticsRow label="CRS" value={frame.wmsCrs ?? "EPSG:3857"} />
-            <AnalyticsRow label="BBOX" value={(frame.bbox ?? [68.0, 6.0, 98.0, 36.0]).join(", ")} />
-            <AnalyticsRow label="Frame Timestamp" value={frame.wmsDate ?? frame.timestamp} />
+            <AnalyticsRow label="BBOX" value={(frame.bbox ?? sessionDiagnostics?.bbox ?? []).join(", ")} />
+            <AnalyticsRow label="Frame Timestamp" value={frame.wmsTime ?? frame.timestamp} />
             {latestWmsRequest && (
               <>
                 <AnalyticsRow label="Last WMS Status" value={`${latestWmsRequest.statusCode ?? "?"}`} />
                 <AnalyticsRow label="Last WMS URL" value={<UrlValue value={latestWmsRequest.requestedUrl} />} />
+              </>
+            )}
+          </div>
+
+          <div className="pt-4 border-t border-white/5 space-y-4">
+            <AnalyticsRow
+              label="Observed Session"
+              value={sessionDiagnostics ? `${sessionDiagnostics.downloadedFrameCount} observed frames` : "No active GOES session"}
+            />
+            {sessionDiagnostics && (
+              <>
+                <AnalyticsRow label="Requested Window" value={`${sessionDiagnostics.requestedStartTime} -> ${sessionDiagnostics.requestedEndTime}`} />
+                <AnalyticsRow
+                  label="Cadence"
+                  value={
+                    sessionDiagnostics.cadenceMinutes?.medianGapMinutes != null
+                      ? `${sessionDiagnostics.cadenceMinutes.medianGapMinutes.toFixed(1)} min median`
+                      : "Unavailable"
+                  }
+                />
+                <AnalyticsRow
+                  label="Continuity"
+                  value={sessionDiagnostics.validation?.continuousFrames ? "Continuous 5-15 min sequence" : "Gaps detected"}
+                  highlight={!sessionDiagnostics.validation?.continuousFrames}
+                />
+                <AnalyticsRow label="Fetch Failures" value={`${sessionDiagnostics.failedFrameCount}`} highlight={sessionDiagnostics.failedFrameCount > 0} />
               </>
             )}
           </div>
@@ -220,10 +281,27 @@ const FrameInfoPanel = ({
             />
             {latestEvaluation && (
               <>
+                <AnalyticsRow label="Held-Out Samples" value={`${latestEvaluation.sampleCount}`} />
                 <AnalyticsRow label="Average PSNR" value={latestEvaluation.averages.psnr.toFixed(2)} />
                 <AnalyticsRow label="Average SSIM" value={latestEvaluation.averages.ssim.toFixed(4)} />
+                <AnalyticsRow label="Baseline PSNR" value={latestEvaluation.baselineAverages.psnr.toFixed(2)} />
+                <AnalyticsRow label="Confidence Accuracy" value={`${(latestEvaluation.confidenceValidation.confidence_accuracy * 100).toFixed(1)}%`} />
+                {latestEvaluation.confidenceValidation.overall_label_accuracy != null && (
+                  <AnalyticsRow label="Label Accuracy" value={`${(latestEvaluation.confidenceValidation.overall_label_accuracy * 100).toFixed(1)}%`} />
+                )}
+                {latestEvaluation.qualificationGate && (
+                  <AnalyticsRow
+                    label="Qualification Gate"
+                    value={latestEvaluation.qualificationGate.passed ? "Passed" : "Fallback Required"}
+                    highlight={!latestEvaluation.qualificationGate.passed}
+                  />
+                )}
+                <AnalyticsRow label="PRD Thresholds" value={latestEvaluation.targetValidation.meetsAll ? "Passed" : "Below Target"} highlight={!latestEvaluation.targetValidation.meetsAll} />
                 <a className="text-[10px] font-mono text-primary underline underline-offset-4" href="/data/evaluations/latest_evaluation.json" target="_blank" rel="noreferrer">
                   Download Evaluation Report
+                </a>
+                <a className="text-[10px] font-mono text-primary underline underline-offset-4" href="/data/evaluations/latest_evaluation.html" target="_blank" rel="noreferrer">
+                  Open HTML Evaluation
                 </a>
               </>
             )}
@@ -279,6 +357,6 @@ const UrlValue = ({ value }: { value: string }) => (
   </span>
 );
 
-const NASA_SOURCE_LABEL = "NASA GIBS";
+const NASA_SOURCE_LABEL = "NASA GIBS GOES";
 
 export default FrameInfoPanel;

@@ -58,7 +58,7 @@ const MapControlsPanel = ({
             color="gap"
           />
           <LayerToggle 
-            label="Confidence Matrix" 
+            label="Statistical Plausibility" 
             description="Statistical Uncertainty"
             checked={showConfidence} 
             onChange={onToggleConfidence} 

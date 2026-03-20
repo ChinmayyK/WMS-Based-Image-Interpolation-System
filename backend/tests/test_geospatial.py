@@ -39,7 +39,7 @@ def test_save_preprocessed_image(tmpdir):
     assert np.array_equal(saved[0, 0], [0, 0, 255])
 
 def test_align_crs():
-    assert align_crs("EPSG:4326") is True
+    assert align_crs("EPSG:3857") is True
     
     with pytest.raises(PreprocessingError):
-        align_crs("EPSG:3857")
+        align_crs("EPSG:4326")

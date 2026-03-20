@@ -61,10 +61,10 @@ def apply_transparency(image_path: str, output_path: str = None):
         
     cv2.imwrite(output_path, img)
 
-def align_crs(source_crs: str, target_crs: str="EPSG:4326"):
+def align_crs(source_crs: str, target_crs: str="EPSG:3857"):
     """
     In a full GIS context, this would use rasterio.warp to reproject.
-    Since we are working with pre-projected WMS PNGs returned in EPSG:4326, 
+    Since we are working with pre-projected WMS PNGs returned in EPSG:3857,
     this just validates the assumption.
     """
     if source_crs != target_crs:

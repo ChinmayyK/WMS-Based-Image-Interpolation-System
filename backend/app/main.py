@@ -3,6 +3,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.api.routes import router as api_router
+from app.api.jobs import router as jobs_router
+from app.api.cache import router as cache_router
+from app.api.evaluation import router as evaluation_router
 import os
 import yaml
 
@@ -40,6 +43,9 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 app.mount("/data", StaticFiles(directory=DATA_DIR), name="data")
 
 app.include_router(api_router, prefix="/api")
+app.include_router(jobs_router, prefix="/api/v1/jobs")
+app.include_router(cache_router, prefix="/api/v1")
+app.include_router(evaluation_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():

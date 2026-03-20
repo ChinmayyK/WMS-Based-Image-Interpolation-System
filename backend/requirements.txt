@@ -20,3 +20,4 @@ torchvision
 gdown
 scikit-image
 imageio-ffmpeg
+lpips

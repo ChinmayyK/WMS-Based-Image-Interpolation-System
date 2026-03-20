@@ -6,6 +6,8 @@ import AnimationControls from "@/components/AnimationControls";
 import FrameInfoPanel from "@/components/FrameInfoPanel";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import ErrorPanel from "@/components/ErrorPanel";
+import JobSubmissionPanel from "@/components/JobSubmissionPanel";
+import ExportResultsPanel from "@/components/ExportResultsPanel";
 import { MOCK_FRAMES } from "@/lib/mock-data";
 import { getRuntimeSummary } from "@/lib/frame-status";
 import { SatelliteFrame, PlaybackSpeed, ComparisonMode, DataSource, RuntimeDiagnostics } from "@/lib/types";
@@ -25,6 +27,8 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [jobPhase, setJobPhase] = useState<string>("");
   const [dataSource, setDataSource] = useState<DataSource>("demo");
   const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("off");
   const [toggleView, setToggleView] = useState<"original" | "generated">("original");
@@ -37,14 +41,18 @@ const Index = () => {
   const [interpolationNotice, setInterpolationNotice] = useState<string | null>(null);
   const [exportInProgress, setExportInProgress] = useState(false);
   const [evaluationInProgress, setEvaluationInProgress] = useState(false);
+  const [exportData, setExportData] = useState<any>(null);
   const intervalRef = useRef<number | null>(null);
 
   const currentFrame = frames[currentIndex];
   const selectedPair = resolveInterpolationPair(frames, currentIndex);
+  const nearestObservedFrame = resolveNearestObservedFrame(frames, currentIndex);
 
+  // Initial Demo loading simulation
   useEffect(() => {
+    if (dataSource !== "demo") return;
     let progress = 0;
-    const loadInterval = setInterval(() => {
+    const loadInterval = window.setInterval(() => {
       progress += Math.random() * 25 + 10;
       if (progress >= 100) {
         progress = 100;
@@ -56,7 +64,96 @@ const Index = () => {
       }
     }, 400);
     return () => clearInterval(loadInterval);
-  }, []);
+  }, [dataSource, frames]);
+
+  // Background Job Polling
+  useEffect(() => {
+    if (!currentJobId) return;
+    let pollInterval: number | null = null;
+    let eventSource: EventSource | null = null;
+    let settled = false;
+
+    const hydrateCompletedJob = async () => {
+      try {
+        const [framesRes, diagRes] = await Promise.all([
+          fetch(`/api/v1/jobs/${currentJobId}/frames`),
+          fetch("/api/diagnostics/status"),
+        ]);
+        const framesData = await framesRes.json();
+        if (framesRes.ok && framesData.status === "success") {
+          setFrames(framesData.frames);
+          setCurrentIndex(0);
+        }
+        if (diagRes.ok) {
+          setRuntimeDiagnostics(await diagRes.json());
+        }
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 500);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    const applyJobUpdate = async (job: any) => {
+      setLoadProgress(job.progress || 0);
+      setJobPhase(job.message || job.phase || "Processing...");
+
+      if (settled) return;
+      if (job.status === "COMPLETED") {
+        settled = true;
+        if (pollInterval) clearInterval(pollInterval);
+        eventSource?.close();
+        await hydrateCompletedJob();
+      } else if (job.status === "FAILED") {
+        settled = true;
+        if (pollInterval) clearInterval(pollInterval);
+        eventSource?.close();
+        setIsLoading(false);
+        setError(job.error || "Job failed");
+      }
+    };
+
+    const startPollingFallback = () => {
+      if (pollInterval !== null) return;
+      const checkStatus = async () => {
+        try {
+          const res = await fetch(`/api/v1/jobs/${currentJobId}/status`);
+          if (!res.ok) throw new Error("Job status check failed");
+          const data = await res.json();
+          await applyJobUpdate(data.job);
+        } catch (err) {
+          console.error(err);
+        }
+      };
+      pollInterval = window.setInterval(checkStatus, 1500);
+      void checkStatus();
+    };
+
+    try {
+      eventSource = new EventSource(`/api/v1/jobs/${currentJobId}/stream`);
+      eventSource.onmessage = async (event: MessageEvent<string>) => {
+        const data = JSON.parse(event.data);
+        await applyJobUpdate(data.job);
+      };
+      eventSource.addEventListener("status", async (event: MessageEvent<string>) => {
+        const data = JSON.parse(event.data);
+        await applyJobUpdate(data.job);
+      });
+      eventSource.onerror = () => {
+        eventSource?.close();
+        startPollingFallback();
+      };
+    } catch (err) {
+      console.error(err);
+      startPollingFallback();
+    }
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+      eventSource?.close();
+    };
+  }, [currentJobId]);
 
   useEffect(() => {
     setInterpolationNotice(buildInterpolationNotice(dataSource, currentFrame, selectedPair));
@@ -83,13 +180,26 @@ const Index = () => {
     };
   }, [isPlaying, speed, goNext, frames.length]);
 
-  const fetchFromApi = useCallback(async () => {
+  const fetchFromApi = useCallback(async (refreshObserved = false) => {
     setIsLoading(true);
     setLoadProgress(0);
     setError(null);
 
     try {
-      setLoadProgress(30);
+      if (refreshObserved) {
+        setLoadProgress(20);
+        const ingestResponse = await fetch("/api/frames/fetch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const ingestPayload = await ingestResponse.json();
+        if (!ingestResponse.ok) {
+          throw new Error(ingestPayload.detail || `GOES ingest failed (${ingestResponse.status})`);
+        }
+      }
+
+      setLoadProgress(refreshObserved ? 55 : 30);
       const [framesResponse, diagnosticsResponse] = await Promise.all([
         fetch("/api/frames"),
         fetch("/api/diagnostics/status"),
@@ -99,7 +209,7 @@ const Index = () => {
         throw new Error(`API returned ${framesResponse.status}`);
       }
 
-      setLoadProgress(70);
+      setLoadProgress(75);
       const data = await framesResponse.json();
       const diagnosticsData = diagnosticsResponse.ok ? await diagnosticsResponse.json() : null;
 
@@ -126,11 +236,18 @@ const Index = () => {
     const next = dataSource === "demo" ? "api" : "demo";
     setDataSource(next);
     if (next === "api") {
-      fetchFromApi();
+      setFrames([]); // Clear frames to trigger the form
+      setIsLoading(false);
+      setError(null);
+      setRuntimeDiagnostics(null);
+      setCurrentJobId(null);
+      setExportData(null);
     } else {
       setError(null);
       setFrames(MOCK_FRAMES);
       setRuntimeDiagnostics(null);
+      setCurrentJobId(null);
+      setExportData(null);
       setCurrentIndex(0);
       setIsLoading(true);
       setLoadProgress(0);
@@ -142,8 +259,56 @@ const Index = () => {
   }, [dataSource, fetchFromApi]);
 
   const handleRetry = useCallback(() => {
-    fetchFromApi();
-  }, [fetchFromApi]);
+    if (dataSource === "api") {
+      setError(null);
+      setIsLoading(false);
+      setFrames([]);
+    } else {
+      handleToggleDataSource();
+      handleToggleDataSource();
+    }
+  }, [dataSource, handleToggleDataSource]);
+
+  const handleJobSubmit = async (req: any) => {
+    setIsLoading(true);
+    setLoadProgress(0);
+    setError(null);
+    setJobPhase("Initializing Job...");
+    setExportData(null);
+    
+    try {
+      const res = await fetch("/api/v1/jobs/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to submit job");
+      setCurrentJobId(data.job_id);
+    } catch(err) {
+      setIsLoading(false);
+      setError(err instanceof Error ? err.message : "Submission failed");
+    }
+  };
+
+  const handleJobExport = async () => {
+    if (!currentJobId) return;
+    setExportInProgress(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/jobs/${currentJobId}/export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Export failed");
+      setExportData(data.export);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setExportInProgress(false);
+    }
+  };
 
   const handleGenerateInterpolation = useCallback(async () => {
     if (dataSource !== "api" || !selectedPair) {
@@ -170,7 +335,7 @@ const Index = () => {
       if (!response.ok) {
         throw new Error(payload.detail || `Interpolation failed (${response.status})`);
       }
-      await fetchFromApi();
+      await fetchFromApi(false);
       setInterpolationNotice(
         `Interpolation completed using recursive bisection between ${selectedPair.frame1.timestamp} and ${selectedPair.frame2.timestamp}.`
       );
@@ -247,16 +412,22 @@ const Index = () => {
 
       <main className="flex flex-1 min-h-0 relative px-4 pb-4 gap-4">
         <div className="flex-[4] flex flex-col min-w-0 gap-4">
-          <div className="flex-1 min-h-0 relative glass rounded-xl overflow-hidden border-white/10">
+          <div className="flex-1 min-h-0 relative glass rounded-xl overflow-hidden border-white/10 flex flex-col justify-center">
+            {dataSource === "api" && frames.length === 0 && !currentJobId && !isLoading && !error && (
+              <div className="p-4 overflow-y-auto">
+                <JobSubmissionPanel onSubmit={handleJobSubmit} isSubmitting={isLoading} />
+              </div>
+            )}
+            
             {isLoading && (
               <LoadingOverlay
-                message={loadProgress < 100 ? "INITIALIZING DATA STREAM…" : "SYNCHRONIZING SENSORS…"}
+                message={jobPhase || (loadProgress < 100 ? "INITIALIZING DATA STREAM…" : "SYNCHRONIZING SENSORS…")}
                 progress={loadProgress}
               />
             )}
             {error && <ErrorPanel message={error} onRetry={handleRetry} />}
 
-            {!error && !isLoading && (
+            {!error && !isLoading && frames.length > 0 && (
               <div className="w-full h-full relative">
                 {comparisonMode === "split" ? (
                   <div className="flex w-full h-full gap-2 p-2">
@@ -276,7 +447,7 @@ const Index = () => {
                         onToggleClouds={() => setShowClouds(!showClouds)}
                         showVectors={showVectors}
                         onToggleVectors={() => setShowVectors(!showVectors)}
-                        currentFrame={currentFrame}
+                        currentFrame={nearestObservedFrame || currentFrame}
                         comparisonMode="split"
                         runtimeDiagnostics={runtimeDiagnostics}
                       />
@@ -316,7 +487,7 @@ const Index = () => {
                     onToggleClouds={() => setShowClouds(!showClouds)}
                     showVectors={showVectors}
                     onToggleVectors={() => setShowVectors(!showVectors)}
-                    currentFrame={currentFrame}
+                    currentFrame={comparisonMode === "toggle" && toggleView === "original" ? (nearestObservedFrame || currentFrame) : currentFrame}
                     comparisonMode={comparisonMode}
                     runtimeDiagnostics={runtimeDiagnostics}
                   />
@@ -379,11 +550,40 @@ const Index = () => {
               interpolationNotice={interpolationNotice}
             />
           )}
+
+          {dataSource === "api" && currentJobId && (
+            <ExportResultsPanel
+              exportData={exportData}
+              isExporting={exportInProgress}
+              onExport={handleJobExport}
+              jobCompleted={!isLoading && frames.length > 0}
+            />
+          )}
         </aside>
       </main>
     </div>
   );
 };
+
+function resolveNearestObservedFrame(frames: SatelliteFrame[], currentIndex: number): SatelliteFrame | null {
+  if (!frames.length || currentIndex < 0 || currentIndex >= frames.length) return null;
+  const current = frames[currentIndex];
+  if (current.isOriginal) return current;
+  
+  let offset = 1;
+  while (currentIndex - offset >= 0 || currentIndex + offset < frames.length) {
+    if (currentIndex - offset >= 0) {
+      const leftFrame = frames[currentIndex - offset];
+      if (leftFrame.isOriginal) return leftFrame;
+    }
+    if (currentIndex + offset < frames.length) {
+      const rightFrame = frames[currentIndex + offset];
+      if (rightFrame.isOriginal) return rightFrame;
+    }
+    offset++;
+  }
+  return current;
+}
 
 function resolveInterpolationPair(frames: SatelliteFrame[], currentIndex: number): InterpolationPair | null {
   const currentFrame = frames[currentIndex];
@@ -448,6 +648,10 @@ function computeGapMinutes(left: string, right: string): number | null {
 function parseTimestamp(value: string): number | null {
   if (!value) {
     return null;
+  }
+  if (value.includes("T")) {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? null : parsed;
   }
   const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
   const normalized = isDateOnly ? `${value}T00:00:00Z` : `${value.replace(" ", "T")}:00Z`;

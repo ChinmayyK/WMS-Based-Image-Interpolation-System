@@ -1,7 +1,42 @@
-bbox: [68.111378, 6.753515, 97.395561, 35.674545]
-frame_interval_minutes: 30
+bbox: [-10575351.63, 1345708.41, -6679169.45, 4865942.28]
+frame_interval_minutes: 10
 generated_frames_per_interval: 3
 model: rife
 log_level: INFO
 host: 127.0.0.1
 port: 8000
+interpolation:
+  preferred_model: RIFE 4.6
+  active_model: RIFE HDv3
+  active_version: HDv3
+  benchmark_compliant: false
+  deviation_note: "PRD v2.0 prefers RIFE 4.6. The repository currently ships RIFE HDv3 weights, so this runtime is explicitly marked as a non-benchmark model."
+  weights_file: flownet.pkl
+  expected_sha256: fe854fc8996547c953f732aaa3b78cae76cc0a12833ae856ea0749c4c570d7d8
+  fallback_method: farneback_optical_flow
+  tile_threshold_px: 1024
+  tile_overlap_px: 64
+  suspicious_runtime_ms: 5.0
+confidence:
+  high_threshold: 0.85
+  medium_threshold: 0.65
+  low_threshold: 0.45
+  max_interpolation_gap_minutes: 180
+  rejection_label: REJECTED
+data:
+  raw_frames_dir: data/raw_frames
+  clean_frames_dir: data/clean_frames
+  interpolated_frames_dir: data/interpolated_frames
+  gap_placeholders_dir: data/gap_placeholders
+  exports_dir: data/exports
+  evaluations_dir: data/evaluations
+ingestion:
+  primary_provider: gibs
+  secondary_provider: mosdac
+  cache_ttl_seconds: 86400
+  max_concurrent_requests: 3
+  earthdata_token_env: EARTHDATA_TOKEN
+  mosdac_token_env: MOSDAC_TOKEN
+audits:
+  retention_days: 30
+  directory: data/job_audits
